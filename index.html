@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e0f12">
+<meta name="description" content="Interactive 2D motorcycle suspension simulator for the Husqvarna Norden 901. Tune fork/shock clicks, preload and load, see live sag, damping, bump response, FFT and phase portraits.">
+<title>Norden 901 Suspension Lab</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <h1 id="bikeTitle">Husqvarna Norden <span class="y">901</span> · Suspension Lab</h1>
+  <span class="spacer"></span>
+  <div class="hdr-group">
+    <label class="hdr-lbl" for="bikeSelect">Bike</label>
+    <select id="bikeSelect">
+      <option value="norden901">Husqvarna Norden 901</option>
+      <option value="desertx">Ducati DesertX</option>
+    </select>
+  </div>
+  <div class="hdr-group">
+    <label class="hdr-lbl" for="scenario">Scenario</label>
+    <select id="scenario">
+      <option value="static">Static (sag check)</option>
+      <option value="bump" selected>Road bump</option>
+      <option value="pothole">Pothole</option>
+      <option value="washboard">Washboard</option>
+      <option value="brake">Hard braking</option>
+      <option value="accel">Acceleration</option>
+      <option value="jump">Jump landing</option>
+      <option value="corner">Cornering load</option>
+    </select>
+  </div>
+  <div class="hdr-group">
+    <button id="playBtn" class="primary">▶ Play</button>
+    <button id="loopBtn">⟳ Loop: off</button>
+  </div>
+  <div class="hdr-group">
+    <label class="hdr-lbl" for="slowmo">Slowmo</label>
+    <input type="range" id="slowmo" class="hdr-slider" min="5" max="100" step="5" value="100" title="Slow motion — scales simulation time. 100% = real time, 10% = 10× slower.">
+    <span id="slowmoV" class="hdr-val">1×</span>
+  </div>
+  <div class="hdr-group">
+    <button id="compareBtn">⊕ Compare</button>
+    <button id="resetBtn">Reset</button>
+    <button id="dampBtn">📊 Damping</button>
+    <button id="analysisBtn">📈 Analysis</button>
+    <button id="exportBtn">⬇ CSV</button>
+  </div>
+</header>
+
+<main>
+
+  <!-- LEFT: adjustments -->
+  <section class="panel">
+    <div class="preset-block" style="margin-top:0;margin-bottom:10px;">
+      <div class="preset-head">Presets</div>
+      <div class="preset-row">
+        <button class="preset-btn" id="presetStockBtn" title="Factory defaults — 15 clicks all around, no preload">Stock</button>
+        <button class="preset-btn" id="presetSportBtn" title="Pavement. Stiffer comp/reb, slight preload. Less dive, sharper response.">Sport</button>
+        <button class="preset-btn" id="presetOffRoadBtn" title="Trails/gravel. Soft comp uses full travel, fast reb tracks rough terrain.">Off-Road</button>
+        <button class="preset-btn" id="presetTouringBtn" title="Loaded touring +gear. More preload to restore sag, moderate damping.">Touring</button>
+        <button class="preset-btn" id="presetHeavyBtn" title="Full luggage + pillion. High preload both ends, moderate damping.">Heavy</button>
+        <button class="preset-btn" id="presetEnduroBtn" title="Enduro race. Max compression stiffness, fast rebound, zero preload.">Enduro</button>
+        <button class="preset-btn" id="presetBigJumpBtn" title="Big jumps. High preload, medium damping — absorbs hard landings.">Big Jump</button>
+      </div>
+    </div>
+
+    <h2>Load</h2>
+    <div class="ctrl"><label>Rider weight <span class="v" id="riderV">85 kg</span></label><input type="range" id="rider" min="50" max="130" step="1" value="85"></div>
+    <div class="ctrl"><label>Pillion <span class="v" id="pillionV">0 kg</span></label><input type="range" id="pillion" min="0" max="100" step="1" value="0"></div>
+    <div class="ctrl"><label>Luggage <span class="v" id="luggageV">0 kg</span></label><input type="range" id="luggage" min="0" max="40" step="1" value="0"></div>
+
+    <h3 id="lbl_front">Front · WP APEX 43mm</h3>
+    <div class="ctrl"><label>Preload <span class="v" id="fPreV">0 mm</span></label><input type="range" id="fPre" min="0" max="15" step="1" value="0" title="Spring preload: spacer added to spring length. Raises bike, reduces sag, does NOT change stiffness. Add when too much sag for your weight."><div class="hint">Raises ride height · reduces sag · same spring rate</div></div>
+    <div class="ctrl"><label>Compression <span class="v" id="fCompV">15 clicks</span></label><input type="range" id="fComp" min="0" max="30" step="1" value="15" title="Compression damping: controls how fast the fork collapses on a hit. 30=hardest (stiff, less travel used, choppy on small bumps). 0=softest (more travel, smoother feel, risk of bottoming)."><div class="hint">30=hardest (less dive, choppy) · 0=softest (more travel, plush)</div></div>
+    <div class="ctrl"><label>Rebound <span class="v" id="fRebV">15 clicks</span></label><input type="range" id="fReb" min="0" max="30" step="1" value="15" title="Rebound damping: controls how fast the fork extends after compression. 30=slowest (packing risk on repeated bumps). 0=fastest (wheel chatters, loses traction)."><div class="hint">30=slowest return (packing) · 0=fastest (wheel chatter)</div></div>
+
+    <h3 id="lbl_rear">Rear · WP APEX shock</h3>
+    <div class="ctrl"><label>Preload <span class="v" id="rPreV">0 turns</span></label><input type="range" id="rPre" min="0" max="15" step="1" value="0" title="Rear spring preload: collar turns compress the spring pre-load. Use to restore correct sag when carrying luggage or pillion. Does not change spring rate."><div class="hint">Clockwise turns = more preload = less sag</div></div>
+    <div class="ctrl"><label>Compression <span class="v" id="rCompV">15 clicks</span></label><input type="range" id="rComp" min="0" max="30" step="1" value="15" title="Rear compression damping: how fast shock collapses under load. Stock Norden 901 has no external comp adjuster — this models an aftermarket or modified unit. 30=hardest, 0=softest."><div class="hint">30=hardest · 0=softest · (stock has no adjuster — modelled)</div></div>
+    <div class="ctrl"><label>Rebound <span class="v" id="rRebV">15 clicks</span></label><input type="range" id="rReb" min="0" max="30" step="1" value="15" title="Rear rebound damping: controls how fast shock extends. Too slow = rear packs down. Too fast = rear kicks up, skipping over bumps, loss of traction."><div class="hint">30=slowest (packs down) · 0=fastest (rear kick)</div></div>
+
+    <div class="ctrl" style="margin-top:10px;">
+      <label>Rear progression <span class="v" id="progressionV">0%</span></label>
+      <input type="range" id="progression" min="0" max="50" step="5" value="0">
+      <div class="hint">0% = linear · 50% = strong rising rate (linkage effect)</div>
+    </div>
+
+    <button class="reset-btn" id="stockBtn">Restore stock settings</button>
+
+    <!-- SIM B controls (hidden until compare mode on) -->
+    <div id="compareBar" class="simB-bar">
+      <h3 class="simB-h3 simB-h3-top">⊕ SIM B</h3>
+      <div class="ctrl"><label>Load <span class="simB-val" id="b_riderV">85 kg</span></label><input type="range" id="b_rider" class="simB-range" min="50" max="130" step="1" value="85"></div>
+      <h3 class="simB-h3">Front</h3>
+      <div class="ctrl"><label>Preload <span class="simB-val" id="b_fPreV">0 mm</span></label><input type="range" id="b_fPre" class="simB-range" min="0" max="15" step="1" value="0"></div>
+      <div class="ctrl"><label>Compression <span class="simB-val" id="b_fCompV">15 ck</span></label><input type="range" id="b_fComp" class="simB-range" min="0" max="30" step="1" value="15"></div>
+      <div class="ctrl"><label>Rebound <span class="simB-val" id="b_fRebV">15 ck</span></label><input type="range" id="b_fReb" class="simB-range" min="0" max="30" step="1" value="15"></div>
+      <h3 class="simB-h3">Rear</h3>
+      <div class="ctrl"><label>Preload <span class="simB-val" id="b_rPreV">0 turns</span></label><input type="range" id="b_rPre" class="simB-range" min="0" max="15" step="1" value="0"></div>
+      <div class="ctrl"><label>Compression <span class="simB-val" id="b_rCompV">15 ck</span></label><input type="range" id="b_rComp" class="simB-range" min="0" max="30" step="1" value="15"></div>
+      <div class="ctrl"><label>Rebound <span class="simB-val" id="b_rRebV">15 ck</span></label><input type="range" id="b_rReb" class="simB-range" min="0" max="30" step="1" value="15"></div>
+      <div class="simB-btns">
+        <button id="copyAtoB" class="simB-copy">Copy A→B</button>
+        <button id="resetSimBBtn" class="simB-reset">Reset B</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- CENTER: stage -->
+  <section id="stage">
+    <canvas id="bike"></canvas>
+    <canvas id="ghostStage"></canvas>
+    <div class="overlay" id="stageInfo">—</div>
+    <div class="bottomFlag" id="bottomFlag">BOTTOMING</div>
+    <div class="scrub-bar">
+      <span class="scrub-lbl">◀▶</span>
+      <input type="range" id="scrubSlider" min="0" max="0" step="1" value="0">
+      <span id="scrubTime" class="scrub-time">0.00s</span>
+    </div>
+  </section>
+
+  <!-- RIGHT: telemetry -->
+  <section class="panel">
+    <h2>Static metrics</h2>
+    <div class="telem">
+      <div class="tile"><div class="k">Front sag</div><div class="v" id="m_fSag">—</div></div>
+      <div class="tile"><div class="k">Rear sag</div><div class="v" id="m_rSag">—</div></div>
+      <div class="tile"><div class="k">Front fₙ</div><div class="v" id="m_fHz">—</div></div>
+      <div class="tile"><div class="k">Rear fₙ</div><div class="v" id="m_rHz">—</div></div>
+      <div class="tile"><div class="k">Front ζ</div><div class="v" id="m_fZ">—</div></div>
+      <div class="tile"><div class="k">Rear ζ</div><div class="v" id="m_rZ">—</div></div>
+      <div class="tile"><div class="k">Dive @1g brake</div><div class="v" id="m_dive">—</div></div>
+      <div class="tile"><div class="k">Squat @0.5g</div><div class="v" id="m_squat">—</div></div>
+      <div class="tile"><div class="k">Anti-squat %</div><div class="v" id="m_antiSquat">—</div></div>
+      <div class="tile"><div class="k">Anti-dive %</div><div class="v" id="m_antiDive">—</div></div>
+    </div>
+
+    <h2 style="margin-top:14px;">Live</h2>
+    <div class="telem">
+      <div class="tile"><div class="k">F travel used</div><div class="v sub" id="m_fTrav">—</div></div>
+      <div class="tile"><div class="k">R travel used</div><div class="v sub" id="m_rTrav">—</div></div>
+      <div class="tile"><div class="k">Pitch</div><div class="v sub" id="m_pitch">—</div></div>
+      <div class="tile"><div class="k">Peak |a|</div><div class="v sub" id="m_g">—</div></div>
+    </div>
+
+    <!-- Reference chart -->
+    <div class="chart-lbl"><span style="color:var(--ok)">Predicted response — current settings</span><span style="color:var(--dim);font-size:9px">60mm bump · 60 km/h · current clicks &amp; load</span></div>
+    <canvas id="chartRef" height="148" class="chart-cv"></canvas>
+    <div class="chart-hint">Single clean peak that returns to the dashed sag line within ~1.5s = well tuned. Multiple bounces = rebound too fast. No recovery = rebound too slow (packing). Spike to 100% = bottoming risk.</div>
+
+    <!-- Live front -->
+    <div class="chart-lbl"><span class="c-front">▲ Front travel</span><span class="c-dim" id="m_fTravLbl"></span></div>
+    <canvas id="chartF" height="118" class="chart-cv chart-h-118"></canvas>
+    <div class="chart-hint">Live fork travel. Dashed = static sag. Steep spike = compression; slow fall = rebound. Repeated bumps that don't recover = compression too soft or rebound too slow. Flat trace at bottom = fork barely working (compression too stiff).</div>
+
+    <!-- Live rear -->
+    <div class="chart-lbl"><span class="c-rear">▲ Rear travel</span><span class="c-dim" id="m_rTravLbl"></span></div>
+    <canvas id="chartR" height="118" class="chart-cv chart-h-118"></canvas>
+    <div class="chart-hint">Live rear shock travel. Front and rear should peak and recover at similar rates — mismatch means the bike pitches. Rear packing (rising baseline) = rebound too slow for this bump frequency.</div>
+
+    <!-- G-force chart -->
+    <div class="chart-lbl"><span class="c-g">⚡ G-force</span><span class="c-dim c-sub">0–6g · red zone &gt;3g</span></div>
+    <canvas id="chartG" height="90" class="chart-cv chart-h-90"></canvas>
+    <div class="chart-hint">Body acceleration felt by rider. 1g = normal gravity. Below 2.5g = comfortable. Red zone (>3g) = harsh — can cause fatigue and loss of control. High G with barely-used travel = spring too stiff. High G with full travel = spring too soft or bump too large.</div>
+
+    <!-- Pitch chart -->
+    <div class="chart-lbl"><span class="c-pitch">⟂ Pitch angle</span><span class="c-dim c-sub">±10° · + = nose up</span></div>
+    <canvas id="chartP" height="90" class="chart-cv chart-h-90"></canvas>
+    <div class="chart-hint">Nose-up (+) during acceleration, nose-down (−) under braking. Target: swings under ±3° on road bumps. Sustained pitch bias = sag imbalance (front vs rear). Oscillating pitch = front and rear natural frequencies mismatched.</div>
+
+    <!-- Scenario guide card -->
+    <div class="guide" id="guideCard">
+      <div class="guide-title" id="g_title">—</div>
+      <div class="guide-row"><span class="guide-lbl">What</span><span class="guide-val" id="g_what">—</span></div>
+      <div class="guide-row"><span class="guide-lbl">Good range</span><span class="guide-val" id="g_good">—</span></div>
+      <div class="guide-row"><span class="guide-lbl">Try this</span><span class="guide-val" id="g_try">—</span></div>
+      <div class="guide-row"><span class="guide-lbl">Fix if bad</span><span class="guide-val" id="g_fix">—</span></div>
+    </div>
+
+    <!-- Diagnosis card -->
+    <div class="diag-card" id="diagCard"></div>
+
+    <!-- Factory settings reference -->
+    <details class="factory-ref" open>
+      <summary>Factory Settings · WP APEX</summary>
+      <div class="factory-body">
+        <p class="factory-note">Slider 30 = fully clockwise (hardest). Turn fully clockwise to start, then back off counter-clockwise. Factory counts clicks OUT from fully clockwise — shown as slider position below.</p>
+        <table class="factory-tbl">
+          <thead><tr><th></th><th>Comfort</th><th>Standard</th><th>Sport</th></tr></thead>
+          <tbody>
+            <tr class="factory-section"><td colspan="4">Front Fork (WP APEX 43mm) · 30 clicks · slider position</td></tr>
+            <tr><td>Compression</td><td>10</td><td>15</td><td>20</td></tr>
+            <tr><td>Rebound</td><td>10</td><td>15</td><td>20</td></tr>
+            <tr class="factory-section"><td colspan="4">Rear Shock (WP APEX) · 18 clicks rebound · slider position</td></tr>
+            <tr><td>Rebound</td><td>0</td><td>5</td><td>13</td></tr>
+            <tr class="factory-section"><td colspan="4">Rear Preload · hand-turn dial</td></tr>
+            <tr><td>~80–85 kg rider</td><td colspan="3">8–12 turns clockwise from softest</td></tr>
+          </tbody>
+        </table>
+        <p class="factory-note" style="margin-top:6px;">Rear shock: 18 real clicks scaled to 30-click slider (×1.67). Consult Husqvarna Owner's Manual (under seat) for full chassis recommendations.</p>
+      </div>
+    </details>
+
+    <!-- Physics explainer -->
+    <details class="explainer">
+      <summary>How suspension physics work</summary>
+      <div class="explainer-body">
+        <p><b>Spring (preload / stiffness)</b> — The spring supports your weight. <em>Sag</em> is how much it compresses at rest: target 30% for street ADV. Sag too high = spring too soft. Too low = too stiff or too much preload. Preload only shifts the equilibrium — it does NOT change spring rate or the feel over bumps.</p>
+        <p><b>Compression damping</b> — Controls how fast the spring collapses when a wheel hits something. <em>Stiff compression</em> = less travel used per hit, but harsh feeling, small bumps transferred straight to chassis. <em>Soft compression</em> = spring uses full travel, smoother, but risk of bottoming on big hits.</p>
+        <p><b>Rebound damping</b> — Controls how fast the spring returns after compression. <em>Too slow (30 clicks)</em> = packing: each successive bump finds the suspension already partially compressed from the last hit. The bike sinks deeper each cycle. <em>Too fast (0 clicks)</em> = the wheel kicks back up hard, loses contact with ground, chatters. Correct rebound is the most critical setting for traction.</p>
+        <p><b>Natural frequency (fₙ)</b> — How fast the chassis bounces in Hz. ADV bike target: 1.5–2.5 Hz. Higher = stiffer ride, more feedback. Matching front and rear fₙ keeps the bike balanced over bumps.</p>
+        <p><b>Damping ratio (ζ)</b> — 0 = no damping (bounces forever). 1 = critically damped (returns to rest without oscillating). Real bikes run 0.25–0.55. Too low = bouncy. Too high = harsh, wheel loses contact.</p>
+        <p><b>Washboard resonance</b> — If bumps repeat at the same frequency as your suspension's natural frequency, amplitude grows each cycle. This is why correct rebound matters most on rough roads: if the suspension hasn't returned before the next hit, it packs progressively deeper.</p>
+        <p><b>Weight transfer</b> — Braking shifts load forward: front fork dives, rear extends. Acceleration shifts rearward: rear squats, front unloads. Matching suspension stiffness to these forces keeps the bike stable and steering geometry consistent.</p>
+      </div>
+    </details>
+  </section>
+</main>
+
+<footer>
+  <div class="ctrl" id="f_speed"><label>Speed <span class="v" id="speedV">60 km/h</span></label><input type="range" id="speed" min="10" max="160" step="5" value="60"></div>
+  <div class="ctrl" id="f_bumpH"><label>Bump height <span class="v" id="bumpHV">60 mm</span></label><input type="range" id="bumpH" min="5" max="300" step="5" value="60"></div>
+  <div class="ctrl" id="f_bumpL"><label>Bump length <span class="v" id="bumpLV">300 mm</span></label><input type="range" id="bumpL" min="50" max="2000" step="50" value="300"></div>
+  <div class="ctrl" id="f_decel"><label>Decel/Accel <span class="v" id="decelV">1.0 g</span></label><input type="range" id="decel" min="0.1" max="1.4" step="0.05" value="1.0"></div>
+  <div class="ctrl" id="f_jumpH"><label>Jump height <span class="v" id="jumpHV">1.0 m</span></label><input type="range" id="jumpH" min="0.1" max="3.0" step="0.1" value="1.0"></div>
+</footer>
+
+<!-- Damping Analysis Modal -->
+<div id="dampModal" class="modal modal-damp">
+  <div class="modal-inner modal-inner-damp">
+
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px;">
+      <span style="font-size:14px;font-weight:600;color:var(--accent)">📊 Damping Analysis</span>
+      <span style="font-size:11px;color:var(--dim);flex:1">Live from current slider settings — adjust sliders in the main UI and changes appear here instantly.</span>
+      <button id="dampClose" style="background:var(--panel2);color:var(--text);border:1px solid var(--line);padding:5px 12px;border-radius:4px;cursor:pointer;font-size:13px;">✕ Close</button>
+    </div>
+
+    <div style="font-size:11px;color:var(--dim);margin-bottom:14px;line-height:1.55;border-left:2px solid var(--line);padding-left:10px;">
+      <b style="color:var(--text)">Force–velocity curve:</b> slope = damping force per m/s. Steeper = more resistance. <em style="color:#ff8a00">Orange = compression stroke</em> (wheel hitting bump), <em style="color:#ffe300">yellow = rebound stroke</em> (spring returning).<br>
+      <b style="color:var(--text)">Bump response:</b> suspension travel used (%) over time after a 60 mm bump at 60 km/h. <em style="color:#ff8a00">Orange = compressing</em>, <em style="color:#ffe300">yellow = rebounding</em>. Dashed line = static sag. Red zone = bottoming.
+    </div>
+
+    <div class="damp-grid">
+
+      <!-- FRONT -->
+      <div>
+        <div style="font-size:13px;font-weight:600;color:var(--accent);margin-bottom:6px;">Front Fork · WP APEX 43mm</div>
+        <div id="dvInfoF" style="font-size:11px;color:var(--dim);margin-bottom:8px;font-family:ui-monospace,monospace;background:var(--panel2);padding:5px 8px;border-radius:4px;border:1px solid var(--line)"></div>
+        <div style="font-size:11px;color:var(--dim);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Force–velocity curve</div>
+        <canvas id="dvFVF" height="220" style="display:block;width:100%;border-radius:4px;background:#0a0b0e;margin-bottom:10px;"></canvas>
+        <div style="font-size:11px;color:var(--dim);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Bump response (60mm / 60 km/h)</div>
+        <canvas id="dvTRF" height="170" style="display:block;width:100%;border-radius:4px;background:#0a0b0e;margin-bottom:8px;"></canvas>
+        <div id="dvStF" style="font-size:11px;padding:6px 9px;background:var(--bg);border-radius:4px;border:1px solid var(--line);line-height:1.6;min-height:28px;"></div>
+        <div style="font-size:11px;color:var(--dim);margin-top:10px;margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Phase portrait (velocity vs displacement)</div>
+        <canvas id="dvPhF" height="180" style="display:block;width:100%;border-radius:4px;background:#0a0b0e;"></canvas>
+      </div>
+
+      <!-- REAR -->
+      <div>
+        <div style="font-size:13px;font-weight:600;color:var(--accent2);margin-bottom:6px;">Rear Shock · WP APEX</div>
+        <div id="dvInfoR" style="font-size:11px;color:var(--dim);margin-bottom:8px;font-family:ui-monospace,monospace;background:var(--panel2);padding:5px 8px;border-radius:4px;border:1px solid var(--line)"></div>
+        <div style="font-size:11px;color:var(--dim);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Force–velocity curve</div>
+        <canvas id="dvFVR" height="220" style="display:block;width:100%;border-radius:4px;background:#0a0b0e;margin-bottom:10px;"></canvas>
+        <div style="font-size:11px;color:var(--dim);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Bump response (60mm / 60 km/h)</div>
+        <canvas id="dvTRR" height="170" style="display:block;width:100%;border-radius:4px;background:#0a0b0e;margin-bottom:8px;"></canvas>
+        <div id="dvStR" style="font-size:11px;padding:6px 9px;background:var(--bg);border-radius:4px;border:1px solid var(--line);line-height:1.6;min-height:28px;"></div>
+        <div style="font-size:11px;color:var(--dim);margin-top:10px;margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Phase portrait (velocity vs displacement)</div>
+        <canvas id="dvPhR" height="180" style="display:block;width:100%;border-radius:4px;background:#0a0b0e;"></canvas>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Suspension Analysis Modal -->
+<div id="chartModal" class="modal modal-analysis">
+  <div class="analysis-wrap">
+  <div class="analysis-inner">
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;gap:12px;flex-shrink:0;">
+      <span style="font-size:15px;font-weight:700;color:var(--accent)">📈 Suspension Analysis</span>
+      <span style="font-size:11px;color:var(--dim);flex:1">Predicted bump response + live telemetry. Tweak Sim A and Sim B, compare curves, save snapshots.</span>
+      <button id="chartModalClose" style="background:var(--panel2);color:var(--text);border:1px solid var(--line);padding:5px 12px;border-radius:4px;cursor:pointer;font-size:13px;">✕ Close</button>
+    </div>
+
+    <!-- Snapshot bar -->
+    <div id="snapBar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:7px 10px;background:var(--panel2);border-radius:6px;border:1px solid var(--line);flex-shrink:0;"></div>
+
+    <!-- Body -->
+    <div class="analysis-body">
+
+      <!-- SIDEBAR -->
+      <div class="analysis-side">
+
+        <!-- SIM A -->
+        <div class="mbox" style="border:1px solid rgba(255,227,0,0.2);">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <span style="display:inline-block;width:20px;height:3px;background:#ffe300;border-radius:2px;"></span>
+            <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#ffe300;">Sim A</span>
+          </div>
+          <div class="msec">Load</div>
+          <div class="mctrl"><label>Rider <span id="ma_riderV" style="color:#ffe300">85 kg</span></label><input type="range" id="ma_rider" min="50" max="130" step="1" value="85" style="accent-color:#ffe300"></div>
+          <div class="mctrl"><label>Pillion <span id="ma_pillionV" style="color:#ffe300">0 kg</span></label><input type="range" id="ma_pillion" min="0" max="100" step="1" value="0" style="accent-color:#ffe300"></div>
+          <div class="mctrl"><label>Luggage <span id="ma_luggageV" style="color:#ffe300">0 kg</span></label><input type="range" id="ma_luggage" min="0" max="40" step="1" value="0" style="accent-color:#ffe300"></div>
+          <div class="msec">Front · WP APEX 43mm</div>
+          <div class="mctrl"><label>Preload <span id="ma_fPreV" style="color:#ffe300">0 mm</span></label><input type="range" id="ma_fPre" min="0" max="15" step="1" value="0" style="accent-color:#ffe300"></div>
+          <div class="mctrl"><label>Compression <span id="ma_fCompV" style="color:#ffe300">15 clicks</span></label><input type="range" id="ma_fComp" min="0" max="30" step="1" value="15" style="accent-color:#ffe300"></div>
+          <div class="mctrl"><label>Rebound <span id="ma_fRebV" style="color:#ffe300">15 clicks</span></label><input type="range" id="ma_fReb" min="0" max="30" step="1" value="15" style="accent-color:#ffe300"></div>
+          <div class="msec">Rear · WP APEX shock</div>
+          <div class="mctrl"><label>Preload <span id="ma_rPreV" style="color:#ff8a00">0 turns</span></label><input type="range" id="ma_rPre" min="0" max="15" step="1" value="0" style="accent-color:#ff8a00"></div>
+          <div class="mctrl"><label>Compression <span id="ma_rCompV" style="color:#ff8a00">15 clicks</span></label><input type="range" id="ma_rComp" min="0" max="30" step="1" value="15" style="accent-color:#ff8a00"></div>
+          <div class="mctrl"><label>Rebound <span id="ma_rRebV" style="color:#ff8a00">15 clicks</span></label><input type="range" id="ma_rReb" min="0" max="30" step="1" value="15" style="accent-color:#ff8a00"></div>
+        </div>
+
+        <!-- SIM B -->
+        <div class="mbox" style="border:1px solid rgba(79,195,247,0.2);">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <span style="display:inline-block;width:20px;border-top:2.5px dashed #4fc3f7;margin-top:1px;"></span>
+            <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#4fc3f7;">Sim B</span>
+            <span id="bModalNote" style="font-size:10px;color:var(--dim);flex:1;">· Inactive</span>
+            <button id="bModalToggle" style="padding:2px 8px;font-size:10px;border-radius:3px;cursor:pointer;background:var(--panel2);color:var(--dim);border:1px solid var(--line);">Start B</button>
+          </div>
+          <div id="bModalSliders" style="opacity:0.45;pointer-events:none;">
+            <div class="msec">Load</div>
+            <div class="mctrl"><label style="color:#4fc3f7bb">Rider <span id="bm_riderV" style="color:#4fc3f7">85 kg</span></label><input type="range" id="bm_rider" min="50" max="130" step="1" value="85" style="accent-color:#4fc3f7"></div>
+            <div class="msec">Front</div>
+            <div class="mctrl"><label style="color:#4fc3f7bb">Preload <span id="bm_fPreV" style="color:#4fc3f7">0 mm</span></label><input type="range" id="bm_fPre" min="0" max="15" step="1" value="0" style="accent-color:#4fc3f7"></div>
+            <div class="mctrl"><label style="color:#4fc3f7bb">Compression <span id="bm_fCompV" style="color:#4fc3f7">15 clicks</span></label><input type="range" id="bm_fComp" min="0" max="30" step="1" value="15" style="accent-color:#4fc3f7"></div>
+            <div class="mctrl"><label style="color:#4fc3f7bb">Rebound <span id="bm_fRebV" style="color:#4fc3f7">15 clicks</span></label><input type="range" id="bm_fReb" min="0" max="30" step="1" value="15" style="accent-color:#4fc3f7"></div>
+            <div class="msec">Rear</div>
+            <div class="mctrl"><label style="color:#4fc3f7bb">Preload <span id="bm_rPreV" style="color:#80deea">0 turns</span></label><input type="range" id="bm_rPre" min="0" max="15" step="1" value="0" style="accent-color:#80deea"></div>
+            <div class="mctrl"><label style="color:#4fc3f7bb">Compression <span id="bm_rCompV" style="color:#80deea">15 clicks</span></label><input type="range" id="bm_rComp" min="0" max="30" step="1" value="15" style="accent-color:#80deea"></div>
+            <div class="mctrl"><label style="color:#4fc3f7bb">Rebound <span id="bm_rRebV" style="color:#80deea">15 clicks</span></label><input type="range" id="bm_rReb" min="0" max="30" step="1" value="15" style="accent-color:#80deea"></div>
+          </div>
+        </div>
+
+        <!-- Bump scenario -->
+        <div class="mbox" style="border:1px solid var(--line);">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--dim);margin-bottom:8px;">Bump Scenario</div>
+          <div class="mctrl"><label>Speed <span id="ma_speedV" class="ma-acc">60 km/h</span></label><input type="range" id="ma_speed" min="10" max="160" step="5" value="60"></div>
+          <div class="mctrl"><label>Height <span id="ma_bumpHV" class="ma-acc">60 mm</span></label><input type="range" id="ma_bumpH" min="5" max="300" step="5" value="60"></div>
+          <div class="mctrl"><label>Length <span id="ma_bumpLV" class="ma-acc">300 mm</span></label><input type="range" id="ma_bumpL" min="50" max="2000" step="50" value="300"></div>
+        </div>
+
+        <!-- Ideal recommendations -->
+        <div class="mbox" style="border:1px solid rgba(52,199,89,0.2);">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:rgba(52,199,89,0.9);margin-bottom:4px;">◎ Ideal for Sim A</div>
+          <div id="idealPanel"></div>
+        </div>
+
+      </div>
+
+      <!-- CHARTS AREA -->
+      <div class="analysis-main">
+
+        <!-- Legend strip -->
+        <div id="chartLegend" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:7px 12px;background:var(--panel2);border-radius:6px;border:1px solid var(--line);flex-shrink:0;"></div>
+
+        <!-- Front chart -->
+        <div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.6px;color:#ffe300;margin-bottom:5px;">
+            ▲ FRONT · WP APEX 43mm
+            <span style="font-size:10px;color:var(--dim);font-weight:400;letter-spacing:0;"> — suspension travel % over 2.5 s after bump</span>
+          </div>
+          <canvas id="bigChartF" height="220" style="display:block;width:100%;height:220px;background:#0a0b0e;border-radius:6px;border:1px solid var(--line);"></canvas>
+          <div id="statsF" style="margin-top:6px;"></div>
+        </div>
+
+        <!-- Rear chart -->
+        <div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.6px;color:#ff8a00;margin-bottom:5px;">
+            ▲ REAR · WP APEX shock
+            <span style="font-size:10px;color:var(--dim);font-weight:400;letter-spacing:0;"> — suspension travel % over 2.5 s after bump</span>
+          </div>
+          <canvas id="bigChartR" height="220" style="display:block;width:100%;height:220px;background:#0a0b0e;border-radius:6px;border:1px solid var(--line);"></canvas>
+          <div id="statsR" style="margin-top:6px;"></div>
+        </div>
+
+        <!-- FFT frequency analysis -->
+        <div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.6px;color:#34c759;margin-bottom:5px;">
+            ◈ FREQUENCY ANALYSIS
+            <span style="font-size:10px;color:var(--dim);font-weight:400;letter-spacing:0;"> — power spectrum of suspension travel (DFT · Hanning window)</span>
+          </div>
+          <div class="two-col-grid">
+            <div>
+              <div style="font-size:10px;color:#ffe300;margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px;">Front</div>
+              <canvas id="fftChartF" height="120" style="display:block;width:100%;background:#0a0b0e;border-radius:6px;border:1px solid var(--line);"></canvas>
+            </div>
+            <div>
+              <div style="font-size:10px;color:#ff8a00;margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px;">Rear</div>
+              <canvas id="fftChartR" height="120" style="display:block;width:100%;background:#0a0b0e;border-radius:6px;border:1px solid var(--line);"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live telemetry in modal -->
+        <div style="border-top:1px solid var(--line);padding-top:10px;">
+          <div style="font-size:11px;font-weight:700;letter-spacing:.6px;color:#ff6b35;margin-bottom:5px;">
+            ⚡ LIVE G-FORCE
+            <span style="font-size:10px;color:var(--dim);font-weight:400;letter-spacing:0;"> — body acceleration felt by rider · red zone &gt;3g</span>
+          </div>
+          <canvas id="modalChartG" height="100" style="display:block;width:100%;height:100px;background:#0a0b0e;border-radius:6px;border:1px solid var(--line);margin-bottom:4px;"></canvas>
+          <div class="chart-hint">Spikes above 3g (red) = harsh hits. Below 2.5g = comfortable. Stiff spring = high G + low travel. Soft spring = high G + high travel. Good setups produce consistent, moderate peaks.</div>
+        </div>
+
+        <div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.6px;color:#a78bfa;margin-bottom:5px;">
+            ⟂ LIVE PITCH ANGLE
+            <span style="font-size:10px;color:var(--dim);font-weight:400;letter-spacing:0;"> — ±10° · positive = nose up</span>
+          </div>
+          <canvas id="modalChartP" height="100" style="display:block;width:100%;height:100px;background:#0a0b0e;border-radius:6px;border:1px solid var(--line);margin-bottom:4px;"></canvas>
+          <div class="chart-hint">Nose-down under braking, nose-up under acceleration. Target &lt;±3° on road bumps. Larger swings = sag imbalance or unmatched front/rear natural frequencies. Slow return to zero = damping asymmetry.</div>
+        </div>
+
+        <div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.6px;color:var(--dim);margin-bottom:5px;">
+            ◉ PHASE PORTRAITS
+            <span style="font-size:10px;color:var(--dim);font-weight:400;letter-spacing:0;"> — velocity vs displacement · shows damping character</span>
+          </div>
+          <div class="two-col-grid">
+            <div>
+              <div style="font-size:10px;color:#ffe300;margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px;">Front</div>
+              <canvas id="modalPhF" height="150" style="display:block;width:100%;background:#0a0b0e;border-radius:6px;border:1px solid var(--line);"></canvas>
+            </div>
+            <div>
+              <div style="font-size:10px;color:#ff8a00;margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px;">Rear</div>
+              <canvas id="modalPhR" height="150" style="display:block;width:100%;background:#0a0b0e;border-radius:6px;border:1px solid var(--line);"></canvas>
+            </div>
+          </div>
+          <div class="chart-hint">X-axis = suspension displacement (0 = sag, right = more compressed). Y-axis = velocity (up = compressing, down = rebounding). Tight oval = well-damped. Wide loop = underdamped. Lopsided = compression/rebound ratio off. Spiral inward = settling correctly after bump.</div>
+        </div>
+
+        <div id="snapLegend" style="font-size:10px;color:var(--dim);line-height:1.8;font-family:ui-monospace,monospace;padding:4px 0;"></div>
+      </div>
+
+    </div>
+  </div>
+  </div>
+</div>
+
+<script src="physics.js"></script>
+<script src="render.js"></script>
+<script src="ui.js"></script>
+</body>
+</html>
