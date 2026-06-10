@@ -92,33 +92,48 @@ function drawBikeFull(ctx, cx, cy, scale, fComp, rComp, airborne, yAir, ter, sim
   drawWheel(ctx, wfS.sx, wfS.sy, rWheelF*scale, simT, true,  loadF);
   drawWheel(ctx, wrS.sx, wrS.sy, rWheelR*scale, simT, false, loadR);
 
-  // Swingarm pivot — ~520mm forward of rear axle, at rear axle height (correct motorcycle geometry)
+  // Swingarm pivot — FRAME-FIXED (~520mm ahead of the axle, ~450mm high on the
+  // sprung chassis). The arm visibly rotates about it as the wheel moves,
+  // exactly like the real bike.
   const swPivSx = cx + (xR + 0.52) * scale;
-  const swPivSy = wrS.sy;   // swingarm pivot at same height as rear axle ≈ horizontal arm
+  const swPivSy = frRS.sy + 0.29*scale;
 
-  // SWINGARM — angled forward from rear axle to pivot (NOT vertical)
+  // SWINGARM — rear axle up-forward to the frame pivot
   ctx.strokeStyle = '#1a1c22'; ctx.lineWidth = 15;
   ctx.beginPath(); ctx.moveTo(wrS.sx, wrS.sy); ctx.lineTo(swPivSx, swPivSy); ctx.stroke();
   ctx.strokeStyle = '#3a3e48'; ctx.lineWidth = 10;
   ctx.beginPath(); ctx.moveTo(wrS.sx, wrS.sy); ctx.lineTo(swPivSx, swPivSy); ctx.stroke();
   ctx.strokeStyle = 'rgba(180,190,205,0.22)'; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(wrS.sx-1, wrS.sy-3); ctx.lineTo(swPivSx-1, swPivSy-3); ctx.stroke();
-
-  // REAR LINKAGE — bell crank on swingarm near pivot
-  const linkPivotX = swPivSx - 0.01*scale, linkPivotY = swPivSy - 0.02*scale;
-  const bellAng = -Math.PI/4 + rCompPct * 0.6;
-  const bellTipX = linkPivotX + Math.cos(bellAng) * 0.05*scale;
-  const bellTipY = linkPivotY + Math.sin(bellAng) * 0.05*scale;
-  ctx.strokeStyle = '#404550'; ctx.lineWidth = 4;
-  ctx.beginPath(); ctx.moveTo(linkPivotX, linkPivotY); ctx.lineTo(bellTipX, bellTipY); ctx.stroke();
+  // Pivot bolt
   ctx.fillStyle = '#5a5e68';
-  ctx.beginPath(); ctx.arc(linkPivotX, linkPivotY, 3, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.arc(bellTipX, bellTipY, 2.5, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(swPivSx, swPivSy, 4, 0, Math.PI*2); ctx.fill();
 
-  // REAR SHOCK — bottom via bell crank, top mounts to frame above swingarm pivot
-  const shockBx = bellTipX, shockBy = bellTipY;
-  const shockTx = swPivSx + 0.02*scale;
-  const shockTy = frRS.sy - 0.18*scale;   // frame mount, same height as frame tail anchor
+  // DRIVE CHAIN — front sprocket just behind the pivot to the rear sprocket;
+  // runs follow the swingarm so chain tension geometry reads correctly
+  const sprR = 0.082*scale, sprF = 0.026*scale;
+  const fspX = swPivSx - 0.030*scale, fspY = swPivSy + 0.012*scale;
+  ctx.strokeStyle = '#23272f'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(fspX, fspY - sprF); ctx.lineTo(wrS.sx, wrS.sy - sprR); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(fspX, fspY + sprF); ctx.lineTo(wrS.sx, wrS.sy + sprR); ctx.stroke();
+  ctx.strokeStyle = 'rgba(150,160,180,0.35)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(fspX, fspY - sprF + 1); ctx.lineTo(wrS.sx, wrS.sy - sprR + 1); ctx.stroke();
+  // Rear sprocket ring
+  ctx.strokeStyle = '#3a3e48'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.arc(wrS.sx, wrS.sy, sprR, 0, Math.PI*2); ctx.stroke();
+
+  // REAR SHOCK — bottom eye on the swingarm 30% out from the pivot (visual
+  // motion ratio ≈ 3:1 like the real linkage), top on the frame under the seat.
+  const shockBx = swPivSx + (wrS.sx - swPivSx)*0.30;
+  const shockBy = swPivSy + (wrS.sy - swPivSy)*0.30;
+  const shockTx = swPivSx + 0.03*scale;
+  const shockTy = frRS.sy + 0.09*scale;
+  // Linkage hint: short link from the pivot area to the shock bottom eye
+  ctx.strokeStyle = '#404550'; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(swPivSx + 0.012*scale, swPivSy + 0.018*scale);
+  ctx.lineTo(shockBx, shockBy + 3); ctx.stroke();
+  ctx.fillStyle = '#5a5e68';
+  ctx.beginPath(); ctx.arc(shockBx, shockBy + 2, 3, 0, Math.PI*2); ctx.fill();
   const shockBodyCol = rCompPct > 0.85 ? '#ff3b30' : rCompPct > 0.65 ? '#a02800' : '#2a2e38';
   const springCol    = rCompPct > 0.85 ? '#ff3b30' : rCompPct > 0.65 ? '#ff8a00' : '#a8aebc';
 
@@ -132,15 +147,15 @@ function drawBikeFull(ctx, cx, cy, scale, fComp, rComp, airborne, yAir, ter, sim
   ctx.strokeStyle = shockBodyCol; ctx.lineWidth = 9;
   ctx.beginPath(); ctx.moveTo(shockBx, shockBy); ctx.lineTo(shockTx, shockTy); ctx.stroke();
   // Piggyback reservoir — offset perpendicular from shock body, 1/3 from bottom
-  const resX = shockBx + shUx*shLen*0.33 + shNx*12;
-  const resY = shockBy + shUy*shLen*0.33 + shNy*12;
+  const resX = shockBx + shUx*shLen*0.33 + shNx*9;
+  const resY = shockBy + shUy*shLen*0.33 + shNy*9;
   ctx.fillStyle = '#1c2028'; ctx.strokeStyle = '#454a55'; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.ellipse(resX, resY, 7, 14, Math.atan2(shUy, shUx) + Math.PI/2, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(resX, resY, 5, 10, Math.atan2(shUy, shUx) + Math.PI/2, 0, Math.PI*2); ctx.fill(); ctx.stroke();
   ctx.fillStyle = '#ffe300';
   ctx.beginPath(); ctx.arc(resX, resY, 2, 0, Math.PI*2); ctx.fill();
   // Spring coils
-  const coilAmp = 10 * (1 - rCompPct*0.55);
-  const nCoilPts = 36;
+  const coilAmp = 8 * (1 - rCompPct*0.55);
+  const nCoilPts = 28;
   ctx.strokeStyle = springCol; ctx.lineWidth = 3;
   ctx.beginPath();
   for (let i = 0; i <= nCoilPts; i++){
@@ -236,10 +251,10 @@ function drawBikeFull(ctx, cx, cy, scale, fComp, rComp, airborne, yAir, ter, sim
   const frA = pt(0.08, 0.04*scale), frB = pt(0.22, 0.04*scale);
   const frC = pt(0.22,-0.04*scale), frD = pt(0.08,-0.04*scale);
   const frE = pt(0.62, 0.06*scale), frF2= pt(0.62,-0.01*scale);
-  ctx.strokeStyle = '#c8a020'; ctx.lineWidth = 3;
+  ctx.strokeStyle = '#7d6418'; ctx.lineWidth = 2.5;
   ctx.beginPath(); ctx.moveTo(frA.x,frA.y); ctx.lineTo(frE.x,frE.y); ctx.stroke(); // lower spar
   ctx.beginPath(); ctx.moveTo(frD.x,frD.y); ctx.lineTo(frF2.x,frF2.y); ctx.stroke(); // upper spar
-  ctx.strokeStyle = '#a07800'; ctx.lineWidth = 1.5;
+  ctx.strokeStyle = '#6a5512'; ctx.lineWidth = 1.2;
   ctx.beginPath(); ctx.moveTo(frB.x,frB.y); ctx.lineTo(frF2.x,frF2.y); ctx.stroke(); // diagonal
 
   // SKID PLATE under engine
@@ -342,7 +357,7 @@ function drawBikeFull(ctx, cx, cy, scale, fComp, rComp, airborne, yAir, ter, sim
   // RALLY BEAK FAIRING — large Norden 901 duck-bill, forward of head tube
   const beakW = 0.28*scale;  // forward extension
   const beakTop = headY + 0.00*scale;
-  const beakBot = headY + 0.22*scale;
+  const beakBot = headY + 0.17*scale;   // kept above the front wheel
 
   // Main beak body — arctic white
   ctx.fillStyle = '#f0f2f5'; ctx.strokeStyle = '#0c0d11'; ctx.lineWidth = 1.5;
@@ -434,85 +449,85 @@ function drawBikeFull(ctx, cx, cy, scale, fComp, rComp, airborne, yAir, ter, sim
   ctx.lineTo(barLx + 0.030*scale, barLy + 0.022*scale);
   ctx.lineTo(barLx + 0.005*scale, barLy + 0.012*scale);
   ctx.closePath(); ctx.fill(); ctx.stroke();
-  // Mirror stalk
+  // Mirror stalk — rises above the bars
   ctx.strokeStyle = '#3a3e48'; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(barLx, barLy); ctx.lineTo(barLx + 0.005*scale, barLy + 0.04*scale); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(barLx - 0.01*scale, barLy); ctx.lineTo(barLx - 0.02*scale, barLy - 0.05*scale); ctx.stroke();
   ctx.fillStyle = '#1c1e25';
-  ctx.beginPath(); ctx.ellipse(barLx + 0.008*scale, barLy + 0.045*scale, 0.015*scale, 0.008*scale, -0.3, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(barLx - 0.023*scale, barLy - 0.055*scale, 0.015*scale, 0.008*scale, -0.3, 0, Math.PI*2); ctx.fill();
 
-  // RIDER — dynamic lean based on accelG
-  const seatPtBase = pt(0.62, 0.18*scale);
-  const helmAnchor = pt(0.55 + leanLong*0.3, 0.40*scale);  // helm shifts fwd under brake
-  const barsAnchor = pt(0.08, 0.18*scale);
-  // Hip stays on seat
-  const hip = seatPtBase;
-  // Torso: lean angle from accelG
-  const torsoLean = -leanLong * 0.4;  // negative G (accel) → lean back, positive (brake) → fwd
-  const torsoLen = 0.22 * scale;
-  const torso = {
-    x: hip.x + Math.sin(torsoLean) * torsoLen * (uy < 0 ? -1 : 1),
-    y: hip.y - Math.cos(torsoLean) * torsoLen + leanLong * 0.05 * scale,
-  };
-  // For a side-on view simpler: shift helm + shoulder
-  const helmShift = leanLong * 0.06*scale;
-  const helmFinal = { x: helmAnchor.x + helmShift, y: helmAnchor.y - Math.abs(leanLong)*0.02*scale };
+  // RIDER — full seated figure: boot on peg, bent leg, hip on seat, leaning
+  // torso, arm to the actual handlebar grip, helmet. Posture follows accelG:
+  // braking (leanLong>0) pushes shoulders/helmet forward, accel pulls them back.
+  // Frame t runs head(0, front) → tail(1, rear); front of bike is +x (right).
+  const hip      = pt(0.60, 0.16*scale);
+  const peg      = pt(0.46, -0.13*scale);                       // footpeg by the engine
+  const knee     = pt(0.41, 0.045*scale);
+  const shoulder = pt(0.38 - leanLong*0.28, (0.355 - Math.abs(leanLong)*0.06)*scale);
+  const grip     = { x: barLx - 0.012*scale, y: barLy + 0.008*scale };
+  const helmFinal = { x: shoulder.x + (0.030 + leanLong*0.10)*scale,
+                      y: shoulder.y - 0.082*scale };
 
-  // Seat-mounted rider body
-  const riderW = 0.068*scale, riderH = 0.14*scale;
-  ctx.fillStyle = '#2a2e3a'; ctx.strokeStyle = '#454a55'; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.ellipse(hip.x, hip.y, riderW, riderH, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-  // Torso/back — visible arc from hip to bar grip
-  const midX = (hip.x + barsAnchor.x)/2 + helmShift*0.5;
-  const midY = (hip.y + barsAnchor.y)/2 - 0.04*scale + leanLong*0.03*scale;
-  ctx.strokeStyle = '#353a48'; ctx.lineWidth = 7;
+  // Far-side leg hint (slightly behind, darker) for depth
+  ctx.strokeStyle = '#1a1e26'; ctx.lineWidth = 8;
+  ctx.beginPath(); ctx.moveTo(hip.x + 5, hip.y + 2); ctx.lineTo(knee.x + 6, knee.y + 3); ctx.stroke();
+
+  // Near leg: thigh + shin in riding-suit grey, knee pad, boot on the peg
+  ctx.strokeStyle = '#2c3240'; ctx.lineWidth = 9;
+  ctx.beginPath(); ctx.moveTo(hip.x, hip.y); ctx.lineTo(knee.x, knee.y); ctx.stroke();
+  ctx.strokeStyle = '#232834'; ctx.lineWidth = 7;
+  ctx.beginPath(); ctx.moveTo(knee.x, knee.y); ctx.lineTo(peg.x, peg.y - 3); ctx.stroke();
+  ctx.fillStyle = '#3d4454';
+  ctx.beginPath(); ctx.arc(knee.x, knee.y, 4.5, 0, Math.PI*2); ctx.fill();
+  // Footpeg + boot (toe points forward)
+  ctx.strokeStyle = '#6a6e78'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(peg.x - 6, peg.y + 4); ctx.lineTo(peg.x + 6, peg.y + 4); ctx.stroke();
+  ctx.fillStyle = '#14171d'; ctx.strokeStyle = '#3a3e48'; ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(hip.x - 0.01*scale, hip.y - 0.08*scale);
-  ctx.quadraticCurveTo(midX, midY, barsAnchor.x + helmShift*0.3, barsAnchor.y + leanLong*0.02*scale);
-  ctx.stroke();
-  ctx.strokeStyle = '#454a58'; ctx.lineWidth = 5;
-  ctx.beginPath();
-  ctx.moveTo(hip.x - 0.01*scale, hip.y - 0.08*scale);
-  ctx.quadraticCurveTo(midX, midY, barsAnchor.x + helmShift*0.3, barsAnchor.y + leanLong*0.02*scale);
-  ctx.stroke();
-  // Riding suit yellow stripe
+  ctx.moveTo(peg.x - 5, peg.y - 7); ctx.lineTo(peg.x + 12, peg.y - 6);
+  ctx.lineTo(peg.x + 13, peg.y + 2); ctx.lineTo(peg.x - 5, peg.y + 2);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+
+  // Torso — single solid spine from hip to shoulder, arched back
+  const spineCx = (hip.x + shoulder.x)/2 - 0.018*scale;
+  const spineCy = (hip.y + shoulder.y)/2 + 0.005*scale;
+  ctx.strokeStyle = '#3d4658'; ctx.lineWidth = 13;
+  ctx.beginPath(); ctx.moveTo(hip.x, hip.y + 0.005*scale);
+  ctx.quadraticCurveTo(spineCx, spineCy, shoulder.x, shoulder.y); ctx.stroke();
+  // Suit accent stripe along the back
   ctx.strokeStyle = '#ffd400'; ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(hip.x + 0.015*scale, hip.y - 0.065*scale);
-  ctx.quadraticCurveTo(midX + 0.012*scale, midY + 0.015*scale,
-    barsAnchor.x + helmShift*0.3 + 0.01*scale, barsAnchor.y - 0.005*scale + leanLong*0.02*scale);
-  ctx.stroke();
-  // Arms — from shoulder down to handlebar grip (forward lean)
-  const shoulderX = helmFinal.x - 0.015*scale, shoulderY = helmFinal.y + 0.068*scale;
-  const gripX = barsAnchor.x + helmShift*0.3, gripY = barsAnchor.y + leanLong*0.02*scale;
-  ctx.strokeStyle = '#353a48'; ctx.lineWidth = 5;
-  ctx.beginPath();
-  ctx.moveTo(shoulderX, shoulderY);
-  ctx.quadraticCurveTo((shoulderX+gripX)/2, (shoulderY+gripY)/2 - 0.02*scale, gripX, gripY);
-  ctx.stroke();
-  ctx.strokeStyle = '#454a58'; ctx.lineWidth = 3.5;
-  ctx.beginPath();
-  ctx.moveTo(shoulderX, shoulderY);
-  ctx.quadraticCurveTo((shoulderX+gripX)/2, (shoulderY+gripY)/2 - 0.02*scale, gripX, gripY);
-  ctx.stroke();
-  // Helmet — enduro full-face with chin guard
-  const helmR = 0.068*scale;
+  ctx.beginPath(); ctx.moveTo(hip.x - 4, hip.y);
+  ctx.quadraticCurveTo(spineCx - 5, spineCy, shoulder.x - 4, shoulder.y + 2); ctx.stroke();
+
+  // Arm — shoulder to the actual grip with a dropped elbow; straightens
+  // naturally under braking because the shoulder moves toward the fixed grip
+  const elbow = { x: (shoulder.x + grip.x)/2 + 0.012*scale,
+                  y: (shoulder.y + grip.y)/2 + 0.035*scale };
+  ctx.strokeStyle = '#465062'; ctx.lineWidth = 6;
+  ctx.beginPath(); ctx.moveTo(shoulder.x, shoulder.y);
+  ctx.quadraticCurveTo(elbow.x, elbow.y, grip.x, grip.y); ctx.stroke();
+  // Glove on the grip
+  ctx.fillStyle = '#1c1e25';
+  ctx.beginPath(); ctx.arc(grip.x, grip.y, 3.5, 0, Math.PI*2); ctx.fill();
+
+  // Neck + helmet — enduro full-face, visor facing forward
+  ctx.strokeStyle = '#2c313d'; ctx.lineWidth = 6;
+  ctx.beginPath(); ctx.moveTo(shoulder.x, shoulder.y);
+  ctx.lineTo(helmFinal.x - 0.012*scale, helmFinal.y + 0.045*scale); ctx.stroke();
+  const helmR = 0.062*scale;
   ctx.fillStyle = theme.helmet; ctx.strokeStyle = '#803000'; ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.arc(helmFinal.x, helmFinal.y, helmR, 0, Math.PI*2); ctx.fill(); ctx.stroke();
   // Visor
   ctx.fillStyle = 'rgba(20,30,50,0.72)';
-  ctx.beginPath(); ctx.arc(helmFinal.x + 0.020*scale, helmFinal.y + 0.004*scale, helmR*0.70, -0.4, 0.85); ctx.fill();
+  ctx.beginPath(); ctx.arc(helmFinal.x + 0.018*scale, helmFinal.y + 0.004*scale, helmR*0.70, -0.4, 0.85); ctx.fill();
   ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 0.8;
-  ctx.beginPath(); ctx.arc(helmFinal.x + 0.020*scale, helmFinal.y + 0.004*scale, helmR*0.70, -0.4, 0.85); ctx.stroke();
-  // Rally chin guard
+  ctx.beginPath(); ctx.arc(helmFinal.x + 0.018*scale, helmFinal.y + 0.004*scale, helmR*0.70, -0.4, 0.85); ctx.stroke();
+  // Rally peak (sun visor) on top front of the helmet
   ctx.fillStyle = theme.helmet; ctx.strokeStyle = '#60200a'; ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.ellipse(helmFinal.x + 0.032*scale, helmFinal.y - 0.032*scale, 0.022*scale, 0.015*scale, -0.3, 0, Math.PI*2);
-  ctx.fill(); ctx.stroke();
-  // Helmet air scoop detail
-  ctx.fillStyle = 'rgba(0,0,0,0.4)';
-  ctx.beginPath();
-  ctx.ellipse(helmFinal.x - 0.005*scale, helmFinal.y - helmR*0.5, 0.010*scale, 0.005*scale, 0.4, 0, Math.PI*2);
-  ctx.fill();
+  ctx.moveTo(helmFinal.x - 0.005*scale, helmFinal.y - helmR*0.9);
+  ctx.lineTo(helmFinal.x + 0.055*scale, helmFinal.y - helmR*0.75);
+  ctx.lineTo(helmFinal.x + 0.030*scale, helmFinal.y - helmR*0.45);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
 
   // CoG MARKER — shows weight distribution shift
   if (theme.showDebug !== false){
