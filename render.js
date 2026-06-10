@@ -198,6 +198,13 @@ function drawBikeFull(ctx, cx, cy, scale, fComp, rComp, airborne, yAir, ter, sim
     ctx.strokeStyle = 'rgba(220,230,245,0.28)'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.moveTo(sealXf+off-2.5, sealYf); ctx.lineTo(wfS.sx+off-2.5, wfS.sy); ctx.stroke();
   }
+  // Triple clamps — upper at the steering-head stub, lower at the fork tops
+  ctx.strokeStyle = '#23262e'; ctx.lineWidth = 6;
+  ctx.beginPath(); ctx.moveTo(stTopX - 10, stTopY); ctx.lineTo(stTopX + 10, stTopY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(frFS.sx - 10, frFS.sy); ctx.lineTo(frFS.sx + 10, frFS.sy); ctx.stroke();
+  ctx.fillStyle = '#3c414d';
+  ctx.beginPath(); ctx.arc(stTopX, stTopY, 3, 0, Math.PI*2); ctx.fill();
+
   // Fork brace (bottom axle clamp connects both legs)
   ctx.fillStyle = '#2a2e38'; ctx.strokeStyle = '#454850'; ctx.lineWidth = 1;
   ctx.beginPath();
@@ -240,9 +247,10 @@ function drawBikeFull(ctx, cx, cy, scale, fComp, rComp, airborne, yAir, ter, sim
   ctx.quadraticCurveTo(fendCX, fendCY - 0.025*scale, fendCX - fendW*0.45, fendCY + 0.015*scale);
   ctx.closePath(); ctx.fill();
 
-  // FRAME backbone — head to subframe tail (tailY decoupled from shock)
+  // FRAME backbone — head to subframe tail. Tail sits just above the rear
+  // frame anchor so the backbone runs nearly level (~0.80m) like the real bike.
   const headX = stTopX, headY = stTopY;
-  const tailX = frRS.sx + 0.08*scale, tailY = frRS.sy - 0.18*scale;
+  const tailX = frRS.sx + 0.08*scale, tailY = frRS.sy - 0.06*scale;
   const fdx = tailX-headX, fdy = tailY-headY, fLen2 = Math.hypot(fdx,fdy)||1;
   const ux = fdx/fLen2, uy = fdy/fLen2, nx = -uy, ny = ux;
   const pt = (t, up) => ({x: headX+ux*fLen2*t+nx*up, y: headY+uy*fLen2*t+ny*up});
@@ -257,26 +265,27 @@ function drawBikeFull(ctx, cx, cy, scale, fComp, rComp, airborne, yAir, ter, sim
   ctx.strokeStyle = '#6a5512'; ctx.lineWidth = 1.2;
   ctx.beginPath(); ctx.moveTo(frB.x,frB.y); ctx.lineTo(frF2.x,frF2.y); ctx.stroke(); // diagonal
 
-  // SKID PLATE under engine
-  const sp1=pt(0.18,-0.22*scale), sp2=pt(0.58,-0.23*scale);
-  const sp3=pt(0.56,-0.27*scale), sp4=pt(0.20,-0.26*scale);
+  // SKID PLATE under engine (engine bottom ≈ 0.30m above ground)
+  const sp1=pt(0.18,-0.44*scale), sp2=pt(0.58,-0.45*scale);
+  const sp3=pt(0.56,-0.50*scale), sp4=pt(0.20,-0.49*scale);
   ctx.fillStyle = '#3a3e48'; ctx.strokeStyle = '#1c1e25'; ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(sp1.x,sp1.y); ctx.lineTo(sp2.x,sp2.y);
   ctx.lineTo(sp3.x,sp3.y); ctx.lineTo(sp4.x,sp4.y);
   ctx.closePath(); ctx.fill(); ctx.stroke();
 
-  // ENGINE — angular Norden 901 parallel twin
-  const eg1=pt(0.16,-0.04*scale), eg2=pt(0.60,-0.04*scale);
-  const eg3=pt(0.58,-0.22*scale), eg4=pt(0.18,-0.21*scale);
+  // ENGINE — full-depth Norden 901 parallel twin: cylinder head up near the
+  // backbone, crankcase down to the skid plate (fills the real engine bay)
+  const eg1=pt(0.16,-0.05*scale), eg2=pt(0.60,-0.05*scale);
+  const eg3=pt(0.58,-0.44*scale), eg4=pt(0.18,-0.43*scale);
   ctx.fillStyle = '#15171c'; ctx.strokeStyle = '#2a2e38'; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(eg1.x,eg1.y); ctx.lineTo(eg2.x,eg2.y);
   ctx.lineTo(eg3.x,eg3.y); ctx.lineTo(eg4.x,eg4.y); ctx.closePath();
   ctx.fill(); ctx.stroke();
   // Cylinder head highlight
   ctx.fillStyle = '#252830';
-  const ch1=pt(0.20,-0.04*scale), ch2=pt(0.50,-0.04*scale);
-  const ch3=pt(0.49,-0.10*scale), ch4=pt(0.21,-0.10*scale);
+  const ch1=pt(0.20,-0.05*scale), ch2=pt(0.50,-0.05*scale);
+  const ch3=pt(0.49,-0.16*scale), ch4=pt(0.21,-0.16*scale);
   ctx.beginPath(); ctx.moveTo(ch1.x,ch1.y); ctx.lineTo(ch2.x,ch2.y);
   ctx.lineTo(ch3.x,ch3.y); ctx.lineTo(ch4.x,ch4.y); ctx.closePath(); ctx.fill();
   // Cooling fins
@@ -287,71 +296,126 @@ function drawBikeFull(ctx, cx, cy, scale, fComp, rComp, airborne, yAir, ter, sim
     const er2 = {x:eg2.x+(eg3.x-eg2.x)*t, y:eg2.y+(eg3.y-eg2.y)*t};
     ctx.beginPath(); ctx.moveTo(el2.x,el2.y); ctx.lineTo(er2.x,er2.y); ctx.stroke();
   }
-  // Exhaust header pipes (chrome curve from engine)
-  ctx.strokeStyle = '#1a1c22'; ctx.lineWidth = 6;
-  const ex1=pt(0.22,-0.08*scale), ex2=pt(0.05,-0.18*scale);
-  ctx.beginPath(); ctx.moveTo(ex1.x,ex1.y);
-  ctx.quadraticCurveTo(ex1.x-0.04*scale, ex1.y-0.04*scale, ex2.x, ex2.y); ctx.stroke();
-  ctx.strokeStyle = '#9aa0b0'; ctx.lineWidth = 4;
-  ctx.beginPath(); ctx.moveTo(ex1.x,ex1.y);
-  ctx.quadraticCurveTo(ex1.x-0.04*scale, ex1.y-0.04*scale, ex2.x, ex2.y); ctx.stroke();
+  // EXHAUST — header drops from the front cylinder, runs under the engine,
+  // then the silencer canister rises along the right rear like the real bike
+  const exPath = () => {
+    ctx.beginPath();
+    const e1=pt(0.20,-0.10*scale), e2=pt(0.09,-0.34*scale), e3=pt(0.38,-0.49*scale), e4=pt(0.62,-0.37*scale);
+    ctx.moveTo(e1.x,e1.y);
+    ctx.quadraticCurveTo(pt(0.07,-0.14*scale).x, pt(0.07,-0.14*scale).y, e2.x, e2.y);
+    ctx.quadraticCurveTo(pt(0.20,-0.52*scale).x, pt(0.20,-0.52*scale).y, e3.x, e3.y);
+    ctx.lineTo(e4.x, e4.y);
+  };
+  ctx.strokeStyle = '#1a1c22'; ctx.lineWidth = 7; exPath(); ctx.stroke();
+  ctx.strokeStyle = '#7d828f'; ctx.lineWidth = 4.5; exPath(); ctx.stroke();
+  // Silencer canister
+  const sil1=pt(0.62,-0.37*scale), sil2=pt(0.90,-0.14*scale);
+  ctx.strokeStyle = '#14161b'; ctx.lineWidth = 15; ctx.beginPath();
+  ctx.moveTo(sil1.x,sil1.y); ctx.lineTo(sil2.x,sil2.y); ctx.stroke();
+  ctx.strokeStyle = '#4a4f5a'; ctx.lineWidth = 11; ctx.beginPath();
+  ctx.moveTo(sil1.x,sil1.y); ctx.lineTo(sil2.x,sil2.y); ctx.stroke();
+  ctx.strokeStyle = 'rgba(210,220,235,0.25)'; ctx.lineWidth = 2.5; ctx.beginPath();
+  ctx.moveTo(sil1.x-1,sil1.y-4); ctx.lineTo(sil2.x-1,sil2.y-4); ctx.stroke();
+  // End cap
+  ctx.fillStyle = '#0c0d11';
+  ctx.beginPath(); ctx.arc(sil2.x, sil2.y, 6, 0, Math.PI*2); ctx.fill();
 
-  // FUEL TANK — tall Norden silhouette, white/blue rally livery
-  // Sharp angular shape: rises high above frame backbone
-  const tk1=pt(0.30,0.18*scale), tk2=pt(0.34,0.26*scale);
-  const tk3=pt(0.60,0.22*scale), tk4=pt(0.66,0.10*scale);
-  const tk5=pt(0.64,0.03*scale), tk6=pt(0.30,0.04*scale);
-  ctx.fillStyle = '#f0f2f5';   // Arctic white base
-  ctx.strokeStyle = '#0c0d11'; ctx.lineWidth = 1.5;
+  // CLUTCH COVER — round case low on the engine side
+  const cc = pt(0.49,-0.30*scale);
+  ctx.fillStyle = '#262a33'; ctx.strokeStyle = '#3c414d'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(cc.x, cc.y, 0.058*scale, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = '#494f5c'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(cc.x, cc.y, 0.034*scale, 0, Math.PI*2); ctx.stroke();
+
+  // RADIATOR — dark core with subtle vanes at the engine front
+  const rd1=pt(0.165,-0.06*scale), rd2=pt(0.135,-0.30*scale);
+  ctx.strokeStyle = '#20242c'; ctx.lineWidth = 9;
+  ctx.beginPath(); ctx.moveTo(rd1.x,rd1.y); ctx.lineTo(rd2.x,rd2.y); ctx.stroke();
+  ctx.strokeStyle = 'rgba(160,170,190,0.18)'; ctx.lineWidth = 1;
+  for(let i=1;i<=3;i++){
+    const f=i/4;
+    ctx.beginPath();
+    ctx.moveTo(rd1.x+(rd2.x-rd1.x)*f-4, rd1.y+(rd2.y-rd1.y)*f);
+    ctx.lineTo(rd1.x+(rd2.x-rd1.x)*f+4, rd1.y+(rd2.y-rd1.y)*f); ctx.stroke();
+  }
+
+  // FUEL TANK — Norden silhouette: rises behind the dash, crests, then flows
+  // down into the saddle. Arctic white with blue/yellow rally livery.
+  const tkA=pt(0.245,0.07*scale), tkB=pt(0.255,0.21*scale), tkC=pt(0.335,0.265*scale);
+  const tkD=pt(0.58,0.135*scale), tkE=pt(0.565,0.04*scale);
+  ctx.fillStyle = '#f0f2f5'; ctx.strokeStyle = '#0c0d11'; ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.moveTo(tk1.x, tk1.y);
-  ctx.quadraticCurveTo(tk2.x, tk2.y + 0.02*scale, tk3.x, tk3.y);
-  ctx.quadraticCurveTo(tk4.x, tk4.y + 0.005*scale, tk5.x, tk5.y);
-  ctx.lineTo(tk6.x, tk6.y);
+  ctx.moveTo(tkA.x, tkA.y);
+  ctx.lineTo(tkB.x, tkB.y);
+  ctx.quadraticCurveTo(pt(0.28,0.27*scale).x, pt(0.28,0.27*scale).y, tkC.x, tkC.y);
+  ctx.quadraticCurveTo(pt(0.46,0.225*scale).x, pt(0.46,0.225*scale).y, tkD.x, tkD.y);
+  ctx.lineTo(tkE.x, tkE.y);
   ctx.closePath(); ctx.fill(); ctx.stroke();
-  // Blue side panel (Norden livery accent)
+  // Blue lower side panel
   ctx.fillStyle = '#1e5a9e';
   ctx.beginPath();
-  ctx.moveTo(pt(0.34,0.18*scale).x, pt(0.34,0.18*scale).y);
-  ctx.lineTo(pt(0.58,0.16*scale).x, pt(0.58,0.16*scale).y);
-  ctx.lineTo(pt(0.56,0.09*scale).x, pt(0.56,0.09*scale).y);
-  ctx.lineTo(pt(0.36,0.10*scale).x, pt(0.36,0.10*scale).y);
+  ctx.moveTo(pt(0.28,0.13*scale).x, pt(0.28,0.13*scale).y);
+  ctx.lineTo(pt(0.55,0.115*scale).x, pt(0.55,0.115*scale).y);
+  ctx.lineTo(pt(0.545,0.05*scale).x, pt(0.545,0.05*scale).y);
+  ctx.lineTo(pt(0.275,0.075*scale).x, pt(0.275,0.075*scale).y);
   ctx.closePath(); ctx.fill();
-  // Yellow stripe
+  // Yellow accent along the tank crest
   ctx.fillStyle = '#ffd400';
   ctx.beginPath();
-  ctx.moveTo(pt(0.36,0.21*scale).x, pt(0.36,0.21*scale).y);
-  ctx.lineTo(pt(0.56,0.19*scale).x, pt(0.56,0.19*scale).y);
-  ctx.lineTo(pt(0.55,0.17*scale).x, pt(0.55,0.17*scale).y);
-  ctx.lineTo(pt(0.37,0.18*scale).x, pt(0.37,0.18*scale).y);
+  ctx.moveTo(pt(0.31,0.225*scale).x, pt(0.31,0.225*scale).y);
+  ctx.lineTo(pt(0.50,0.175*scale).x, pt(0.50,0.175*scale).y);
+  ctx.lineTo(pt(0.495,0.155*scale).x, pt(0.495,0.155*scale).y);
+  ctx.lineTo(pt(0.315,0.20*scale).x, pt(0.315,0.20*scale).y);
   ctx.closePath(); ctx.fill();
   // Husqvarna text mark on tank
   ctx.fillStyle = '#0c0d11'; ctx.font = `bold ${Math.round(scale*0.018)}px -apple-system,sans-serif`; ctx.textAlign = 'center';
-  const txp = pt(0.46, 0.13*scale);
+  const txp = pt(0.415, 0.155*scale);
   ctx.fillText('HUSQVARNA', txp.x, txp.y);
 
-  // SUBFRAME / SEAT — rally seat, long & flat
-  const seatBase = pt(0.62, 0.10*scale), seatBack = pt(0.95, 0.07*scale);
+  // SUBFRAME / SEAT — continuous rally saddle flowing off the tank,
+  // slight pillion step, tail kick
+  const seatBase = pt(0.58, 0.125*scale), seatBack = pt(0.945, 0.115*scale);
   ctx.strokeStyle = theme.frame; ctx.lineWidth = 4;
-  ctx.beginPath(); ctx.moveTo(seatBase.x, seatBase.y); ctx.lineTo(seatBack.x, seatBack.y); ctx.stroke();
-  // Seat foam
+  ctx.beginPath(); ctx.moveTo(pt(0.60,0.075*scale).x, pt(0.60,0.075*scale).y);
+  ctx.lineTo(pt(0.94,0.065*scale).x, pt(0.94,0.065*scale).y); ctx.stroke();
   ctx.fillStyle = '#1a1c22'; ctx.strokeStyle = '#0c0d11'; ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(seatBase.x, seatBase.y - 6);
-  ctx.lineTo(seatBack.x - 4, seatBack.y - 8);
-  ctx.lineTo(seatBack.x, seatBack.y);
-  ctx.lineTo(seatBase.x - 2, seatBase.y);
+  ctx.moveTo(seatBase.x, seatBase.y);
+  ctx.quadraticCurveTo(pt(0.66,0.10*scale).x, pt(0.66,0.10*scale).y,
+                       pt(0.76,0.125*scale).x, pt(0.76,0.125*scale).y);   // rider dip
+  ctx.quadraticCurveTo(pt(0.86,0.145*scale).x, pt(0.86,0.145*scale).y,
+                       seatBack.x, seatBack.y);                            // pillion rise
+  ctx.lineTo(pt(0.94,0.065*scale).x, pt(0.94,0.065*scale).y);
+  ctx.lineTo(pt(0.60,0.075*scale).x, pt(0.60,0.075*scale).y);
   ctx.closePath(); ctx.fill(); ctx.stroke();
-  // Side number plate panel
+  // Seat stitch line
+  ctx.strokeStyle = 'rgba(200,205,215,0.30)'; ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(pt(0.62,0.105*scale).x, pt(0.62,0.105*scale).y);
+  ctx.lineTo(pt(0.92,0.10*scale).x, pt(0.92,0.10*scale).y); ctx.stroke();
+
+  // TAIL — rear fender flick + taillight
+  ctx.fillStyle = '#e6e9ee'; ctx.strokeStyle = '#0c0d11'; ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(pt(0.94,0.105*scale).x, pt(0.94,0.105*scale).y);
+  ctx.lineTo(pt(1.015,0.06*scale).x, pt(1.015,0.06*scale).y);
+  ctx.lineTo(pt(1.005,0.025*scale).x, pt(1.005,0.025*scale).y);
+  ctx.lineTo(pt(0.93,0.065*scale).x, pt(0.93,0.065*scale).y);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#ff3b30';
+  const tlp = pt(1.005, 0.048*scale);
+  ctx.beginPath(); ctx.arc(tlp.x, tlp.y, 2.5, 0, Math.PI*2); ctx.fill();
+
+  // Side number plate panel under the seat
   ctx.fillStyle = '#f0f2f5';
-  const np1=pt(0.78,0.00*scale), np2=pt(0.95,-0.02*scale);
-  const np3=pt(0.94,-0.10*scale), np4=pt(0.79,-0.08*scale);
+  const np1=pt(0.78,0.04*scale), np2=pt(0.93,0.02*scale);
+  const np3=pt(0.92,-0.055*scale), np4=pt(0.79,-0.035*scale);
   ctx.beginPath();
   ctx.moveTo(np1.x,np1.y); ctx.lineTo(np2.x,np2.y);
   ctx.lineTo(np3.x,np3.y); ctx.lineTo(np4.x,np4.y);
   ctx.closePath(); ctx.fill();
   ctx.fillStyle = '#0c0d11'; ctx.font = `bold ${Math.round(scale*0.022)}px -apple-system,sans-serif`; ctx.textAlign='center';
-  const npp = pt(0.865, -0.045*scale);
+  const npp = pt(0.855, 0.00*scale);
   ctx.fillText('901', npp.x, npp.y);
 
   // RALLY BEAK FAIRING — large Norden 901 duck-bill, forward of head tube
@@ -412,18 +476,18 @@ function drawBikeFull(ctx, cx, cy, scale, fComp, rComp, airborne, yAir, ter, sim
   // WINDSCREEN — short rally screen, curves UPWARD above instruments
   ctx.fillStyle = 'rgba(80,120,160,0.30)'; ctx.strokeStyle = 'rgba(150,200,240,0.55)'; ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.moveTo(headX - 0.02*scale, headY + 0.08*scale);             // base left
-  ctx.quadraticCurveTo(headX + 0.01*scale, headY - 0.07*scale,    // curves up
-                       headX + 0.04*scale, headY - 0.14*scale);   // top right
-  ctx.lineTo(headX + 0.07*scale, headY - 0.11*scale);             // top right edge
-  ctx.quadraticCurveTo(headX + 0.04*scale, headY - 0.02*scale,    // back down
-                       headX + 0.02*scale, headY + 0.09*scale);   // base right
+  ctx.moveTo(headX + 0.02*scale, headY + 0.06*scale);             // base rear
+  ctx.quadraticCurveTo(headX + 0.05*scale, headY - 0.09*scale,    // curves up-forward
+                       headX + 0.09*scale, headY - 0.21*scale);   // top
+  ctx.lineTo(headX + 0.12*scale, headY - 0.18*scale);             // top front edge
+  ctx.quadraticCurveTo(headX + 0.08*scale, headY - 0.04*scale,    // back down
+                       headX + 0.06*scale, headY + 0.07*scale);   // base front
   ctx.closePath(); ctx.fill(); ctx.stroke();
   // Windscreen glare line
   ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(headX - 0.005*scale, headY + 0.04*scale);
-  ctx.quadraticCurveTo(headX + 0.02*scale, headY - 0.04*scale, headX + 0.038*scale, headY - 0.11*scale);
+  ctx.moveTo(headX + 0.04*scale, headY + 0.02*scale);
+  ctx.quadraticCurveTo(headX + 0.06*scale, headY - 0.07*scale, headX + 0.085*scale, headY - 0.18*scale);
   ctx.stroke();
 
   // RALLY DASH POD
@@ -434,9 +498,13 @@ function drawBikeFull(ctx, cx, cy, scale, fComp, rComp, airborne, yAir, ter, sim
   ctx.fillStyle = '#34c759';
   ctx.beginPath(); ctx.arc(headX + 0.018*scale, headY + 0.068*scale, 1.5, 0, Math.PI*2); ctx.fill();
 
-  // WIDE RALLY BARS + HAND GUARDS
-  const barLx = headX + 0.10*scale, barLy = headY + 0.10*scale;
-  const barRx = headX - 0.02*scale, barRy = headY + 0.13*scale;
+  // RISERS + WIDE RALLY BARS — Norden bars sit ~0.15m ABOVE the upper clamp
+  const barLx = headX + 0.035*scale, barLy = headY - 0.13*scale;   // grip (front)
+  const barRx = headX - 0.045*scale, barRy = headY - 0.10*scale;   // bar rear end
+  // Riser post from the upper triple clamp up to the bar
+  ctx.strokeStyle = '#23262e'; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(headX, headY);
+  ctx.lineTo(headX - 0.01*scale, headY - 0.115*scale); ctx.stroke();
   ctx.strokeStyle = '#1c1e25'; ctx.lineWidth = 5;
   ctx.beginPath(); ctx.moveTo(barRx, barRy); ctx.lineTo(barLx, barLy); ctx.stroke();
   ctx.strokeStyle = '#6a6e78'; ctx.lineWidth = 3.2;
@@ -455,24 +523,32 @@ function drawBikeFull(ctx, cx, cy, scale, fComp, rComp, airborne, yAir, ter, sim
   ctx.fillStyle = '#1c1e25';
   ctx.beginPath(); ctx.ellipse(barLx - 0.023*scale, barLy - 0.055*scale, 0.015*scale, 0.008*scale, -0.3, 0, Math.PI*2); ctx.fill();
 
-  // RIDER — full seated figure: boot on peg, bent leg, hip on seat, leaning
-  // torso, arm to the actual handlebar grip, helmet. Posture follows accelG:
-  // braking (leanLong>0) pushes shoulders/helmet forward, accel pulls them back.
+  // RIDER — articulated figure in frame coordinates, so it pitches with the
+  // bike. Seated normally; STANDS on the pegs when airborne. Posture follows
+  // longitudinal G: braking (leanLong>0) drives shoulders/helmet forward and
+  // straightens the arm (grip is fixed); accel pulls the body back.
   // Frame t runs head(0, front) → tail(1, rear); front of bike is +x (right).
-  const hip      = pt(0.60, 0.16*scale);
-  const peg      = pt(0.46, -0.13*scale);                       // footpeg by the engine
-  const knee     = pt(0.41, 0.045*scale);
-  const shoulder = pt(0.38 - leanLong*0.28, (0.355 - Math.abs(leanLong)*0.06)*scale);
+  const stand = airborne ? 1 : 0;
+  const hip      = pt(0.60 - stand*0.05, (0.135 + stand*0.12)*scale);
+  const peg      = pt(0.47, -0.40*scale);     // footpeg at real height (~0.40m)
+  const knee     = pt(0.40 + stand*0.02, (-0.10 + stand*0.05)*scale);
+  const shoulder = pt(0.36 - leanLong*0.28 - stand*0.03,
+                      (0.40 - Math.abs(leanLong)*0.06 + stand*0.07)*scale);
   const grip     = { x: barLx - 0.012*scale, y: barLy + 0.008*scale };
   const helmFinal = { x: shoulder.x + (0.030 + leanLong*0.10)*scale,
-                      y: shoulder.y - 0.082*scale };
+                      y: shoulder.y - 0.085*scale };
+  const elbow = { x: (shoulder.x + grip.x)/2 + 0.012*scale,
+                  y: (shoulder.y + grip.y)/2 + 0.035*scale };
 
-  // Far-side leg hint (slightly behind, darker) for depth
+  // Far-side limbs first (darker, offset) for depth
   ctx.strokeStyle = '#1a1e26'; ctx.lineWidth = 8;
   ctx.beginPath(); ctx.moveTo(hip.x + 5, hip.y + 2); ctx.lineTo(knee.x + 6, knee.y + 3); ctx.stroke();
+  ctx.strokeStyle = '#222733'; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(shoulder.x + 5, shoulder.y + 3);
+  ctx.quadraticCurveTo(elbow.x + 5, elbow.y + 3, grip.x + 5, grip.y + 3); ctx.stroke();
 
   // Near leg: thigh + shin in riding-suit grey, knee pad, boot on the peg
-  ctx.strokeStyle = '#2c3240'; ctx.lineWidth = 9;
+  ctx.strokeStyle = '#2c3240'; ctx.lineWidth = 11;
   ctx.beginPath(); ctx.moveTo(hip.x, hip.y); ctx.lineTo(knee.x, knee.y); ctx.stroke();
   ctx.strokeStyle = '#232834'; ctx.lineWidth = 7;
   ctx.beginPath(); ctx.moveTo(knee.x, knee.y); ctx.lineTo(peg.x, peg.y - 3); ctx.stroke();
@@ -487,6 +563,12 @@ function drawBikeFull(ctx, cx, cy, scale, fComp, rComp, airborne, yAir, ter, sim
   ctx.lineTo(peg.x + 13, peg.y + 2); ctx.lineTo(peg.x - 5, peg.y + 2);
   ctx.closePath(); ctx.fill(); ctx.stroke();
 
+  // Seat contact: hip pad (hidden while standing)
+  if (!airborne){
+    ctx.fillStyle = '#2c3240';
+    ctx.beginPath(); ctx.ellipse(hip.x + 2, hip.y + 3, 0.035*scale, 0.022*scale, -0.15, 0, Math.PI*2); ctx.fill();
+  }
+
   // Torso — single solid spine from hip to shoulder, arched back
   const spineCx = (hip.x + shoulder.x)/2 - 0.018*scale;
   const spineCy = (hip.y + shoulder.y)/2 + 0.005*scale;
@@ -498,10 +580,7 @@ function drawBikeFull(ctx, cx, cy, scale, fComp, rComp, airborne, yAir, ter, sim
   ctx.beginPath(); ctx.moveTo(hip.x - 4, hip.y);
   ctx.quadraticCurveTo(spineCx - 5, spineCy, shoulder.x - 4, shoulder.y + 2); ctx.stroke();
 
-  // Arm — shoulder to the actual grip with a dropped elbow; straightens
-  // naturally under braking because the shoulder moves toward the fixed grip
-  const elbow = { x: (shoulder.x + grip.x)/2 + 0.012*scale,
-                  y: (shoulder.y + grip.y)/2 + 0.035*scale };
+  // Near arm — shoulder to the actual grip with a dropped elbow
   ctx.strokeStyle = '#465062'; ctx.lineWidth = 6;
   ctx.beginPath(); ctx.moveTo(shoulder.x, shoulder.y);
   ctx.quadraticCurveTo(elbow.x, elbow.y, grip.x, grip.y); ctx.stroke();
@@ -580,8 +659,10 @@ function draw(){
   const {w,h} = fitCanvas(cv);
   ctx.clearRect(0,0,w,h);
 
-  const scale = Math.min(w / 2.6, h / 1.8, 520);
-  const cx = w/2, cy = h*0.72;
+  // Stage framing: ground sits low (0.80h) and the scale reserves headroom
+  // for the full bike + rider helmet (~1.4m) plus bump/jump excursion.
+  const scale = Math.min(w / 2.6, h / 2.2, 520);
+  const cx = w/2, cy = h*0.80;
 
   const ter = terrain(sim.t);
   ter.ztF = sim.ztF; ter.ztR = sim.ztR;
@@ -627,8 +708,8 @@ function drawGhost(){
   ghostCtx.fillText(`F sag ${(staticSag2.f/BIKE.fTravel*100).toFixed(0)}%  R sag ${(staticSag2.r/BIKE.rTravel*100).toFixed(0)}%`,w-6,13);
 
   const hInner = h - 18;
-  const scale = Math.min(w/2.6, hInner/1.8, 520);
-  const cx = w/2, cy = 18 + hInner*0.72;
+  const scale = Math.min(w/2.6, hInner/2.2, 520);
+  const cx = w/2, cy = 18 + hInner*0.80;
   const ter = terrain(sim2.t);
   ter.ztF = sim2.ztF; ter.ztR = sim2.ztR;
   drawTerrain(ghostCtx, cx, cy, scale, w, ter);
@@ -658,7 +739,7 @@ function drawTerrain(ctx, cx, cy, scale, w, ter){
       const sign = state.scenario==='pothole' ? -1 : 1;
       const bh = state.bumpH/1000 * sign;
       const L = state.bumpL/1000;
-      const gap = Math.max(2.0, L*3);
+      const gap = Math.max(0.5, +state.bumpGap || Math.max(2.0, L*3));
       const period = L + gap;
       const wheelWorldOffset = +BIKE.wb/2 - (v*sim.t - 0.3*v);
       let xRel = xWorld - wheelWorldOffset;

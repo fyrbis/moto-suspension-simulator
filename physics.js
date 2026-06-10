@@ -183,7 +183,7 @@ const STOCK = {
   rider:85, pillion:0, luggage:0,
   fPre:0, fComp:15, fReb:15,
   rPre:0, rComp:15, rReb:15,
-  speed:10, bumpH:110, bumpL:1500, decel:1.0, jumpH:0.4,
+  speed:10, bumpH:110, bumpL:1500, bumpGap:4.5, decel:1.0, jumpH:0.4,
   scenario:'bump',
 };
 
@@ -272,7 +272,7 @@ function terrain(t){
     const h = state.bumpH/1000 * sign;
     const L = state.bumpL/1000;
     // In loop mode, bumps repeat every (L + gap). Otherwise single bump at t≈0.3s.
-    const gap = Math.max(2.0, L*3);      // m spacing between bumps
+    const gap = Math.max(0.5, +state.bumpGap || Math.max(2.0, L*3)); // m between bumps
     const period = L + gap;
     const profile = x => (x > 0 && x < L) ? h * 0.5*(1 - Math.cos(2*Math.PI*x/L)) : 0;
     const dProfile = x => (x > 0 && x < L) ? h * Math.PI/L * Math.sin(2*Math.PI*x/L) : 0;

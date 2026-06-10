@@ -207,6 +207,7 @@ const inputs = {
   speed:[$('speed'),$('speedV'),v=>`${v} km/h`],
   bumpH:[$('bumpH'),$('bumpHV'),v=>`${v} mm`],
   bumpL:[$('bumpL'),$('bumpLV'),v=>`${v} mm`],
+  bumpGap:[$('bumpGap'),$('bumpGapV'),v=>`${v.toFixed(1)} m`],
   decel:[$('decel'),$('decelV'),v=>`${v.toFixed(2)} g`],
   jumpH:[$('jumpH'),$('jumpHV'),v=>`${v.toFixed(1)} m`],
   progression:[$('progression'),$('progressionV'),v=>`${v}%`],
@@ -287,16 +288,16 @@ $('loopBtn').addEventListener('click',()=>{
 function updateFooterEnable(){
   const s = state.scenario;
   const map = {
-    static:   {speed:0,bumpH:0,bumpL:0,decel:0,jumpH:0},
-    bump:     {speed:1,bumpH:1,bumpL:1,decel:0,jumpH:0},
-    pothole:  {speed:1,bumpH:1,bumpL:1,decel:0,jumpH:0},
-    washboard:{speed:1,bumpH:1,bumpL:1,decel:0,jumpH:0},
-    brake:    {speed:1,bumpH:0,bumpL:0,decel:1,jumpH:0},
-    accel:    {speed:1,bumpH:0,bumpL:0,decel:1,jumpH:0},
-    jump:     {speed:0,bumpH:0,bumpL:0,decel:0,jumpH:1},
-    corner:   {speed:1,bumpH:0,bumpL:0,decel:1,jumpH:0},
+    static:   {speed:0,bumpH:0,bumpL:0,bumpGap:0,decel:0,jumpH:0},
+    bump:     {speed:1,bumpH:1,bumpL:1,bumpGap:1,decel:0,jumpH:0},
+    pothole:  {speed:1,bumpH:1,bumpL:1,bumpGap:1,decel:0,jumpH:0},
+    washboard:{speed:1,bumpH:1,bumpL:1,bumpGap:0,decel:0,jumpH:0},
+    brake:    {speed:1,bumpH:0,bumpL:0,bumpGap:0,decel:1,jumpH:0},
+    accel:    {speed:1,bumpH:0,bumpL:0,bumpGap:0,decel:1,jumpH:0},
+    jump:     {speed:0,bumpH:0,bumpL:0,bumpGap:0,decel:0,jumpH:1},
+    corner:   {speed:1,bumpH:0,bumpL:0,bumpGap:0,decel:1,jumpH:0},
   }[s] || {};
-  ['speed','bumpH','bumpL','decel','jumpH'].forEach(k=>{
+  ['speed','bumpH','bumpL','bumpGap','decel','jumpH'].forEach(k=>{
     $(`f_${k}`).classList.toggle('disabled', !map[k]);
   });
 }
@@ -578,12 +579,12 @@ document.addEventListener('DOMContentLoaded',()=>{
     renderIdealPanel();
   });
 
-  // Default: loop ON, compare ON
+  // Default: loop ON, compare OFF (enable via the Compare button)
   loopMode = true;
   $('loopBtn').textContent = '⟳ Loop: ON';
   $('loopBtn').style.background = 'var(--accent2)';
   $('loopBtn').style.color = '#000';
-  toggleCompare(true);
+  toggleCompare(false);
 });
 
 /* ---------- Boot ---------- */
