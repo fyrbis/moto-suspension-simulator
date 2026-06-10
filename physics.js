@@ -46,9 +46,10 @@ const BIKE = {
   rWheelF: 0.347,       // 21" front wheel rolling radius (rim + 90/90-21 tire)
   rWheelR: 0.333,       // 18" rear wheel rolling radius (rim + 150/70-18 tire)
 
-  // Tire model (quarter-car unsprung mass)
-  mTireF: 8,            // kg — front wheel+axle+brake assembly
-  mTireR: 9,            // kg — rear wheel+axle+sprocket assembly
+  // Tire model (quarter-car unsprung mass; consistent with the 30 kg total
+  // unsprung split in paramsFrom). Wheel-hop fn ≈ 14 Hz front, 12 Hz rear.
+  mTireF: 15,           // kg — front wheel+axle+brakes+lower fork legs
+  mTireR: 18,           // kg — rear wheel+axle+sprocket+~half swingarm
   kTireF: 120000,       // N/m radial tire stiffness (21" dirt-biased)
   kTireR: 100000,       // N/m radial tire stiffness (18" touring)
   cTireF: 140,          // Ns/m tire structural damping (ζ≈0.06, mostly elastic)
@@ -87,7 +88,7 @@ const BIKES = {
     rLSCkneVel: 0.22, rHSCfactor: 0.38,
     fPrePerMm: 190, rPrePerTurn: 90,
     rWheelF: 0.347, rWheelR: 0.333,
-    mTireF: 8, mTireR: 9,
+    mTireF: 15, mTireR: 18,
     kTireF: 120000, kTireR: 100000, cTireF: 140, cTireR: 150,
     antiSquatFrac: 0.75,
     CdA: 0.62, rhoAir: 1.225, hAero: 0.65,
@@ -108,7 +109,7 @@ const BIKES = {
     rLSCkneVel: 0.24, rHSCfactor: 0.40,
     fPrePerMm: 185, rPrePerTurn: 85,
     rWheelF: 0.347, rWheelR: 0.333,
-    mTireF: 8, mTireR: 9,
+    mTireF: 15, mTireR: 18,
     kTireF: 115000, kTireR: 98000, cTireF: 135, cTireR: 145,
     antiSquatFrac: 0.70,
     CdA: 0.58, rhoAir: 1.225, hAero: 0.68,
@@ -131,21 +132,21 @@ const GUIDES = {
     title: 'Road Bump — compression then rebound cycle',
     what: 'Front wheel hits, fork compresses (compression stroke). Spring energy releases, fork extends back (rebound stroke). The chart shows: sharp rise = compression, decay curve = rebound.',
     good: 'Fork uses 40–65% travel per hit. Returns to baseline in 1–1.5 oscillations. Rear follows front smoothly ~0.09s later (wheelbase/speed delay).',
-    try: 'Soften Front Compression (fewer clicks) → more travel used, smoother peak. Slow Front Rebound (more clicks, toward 30) → chart stays elevated after hit = packing. Use Loop mode to see how it accumulates.',
+    try: 'Soften Front Compression (more clicks out) → more travel used, smoother peak. Slow Front Rebound (clicks in, toward 0) → chart stays elevated after hit = packing. Use Loop mode to see how it accumulates.',
     fix: 'Bottoming = stiffen compression (fewer clicks) or add preload. Bouncy after hit = rebound too fast (reduce clicks toward 0). Harsh sharp spike = compression too stiff (add clicks).',
   },
   pothole: {
     title: 'Pothole — extension damping test',
     what: 'Wheel drops into hole then catches. Tests how fast the wheel can follow the road downward. Extension is limited by rebound damping — too slow means wheel loses contact with the road.',
     good: 'Front dips then recovers with pitch under 4°. No topout clunk. Wheel stays in contact.',
-    try: 'Slow Rebound (30 clicks) → nose stays down after pothole, slow recovery. Fast Rebound (0 clicks) → sharp pitch-up on exit edge.',
+    try: 'Slow Rebound (0 clicks, full hard) → nose stays down after pothole, slow recovery. Fast Rebound (30 clicks out) → sharp pitch-up on exit edge.',
     fix: 'Wheel losing ground contact = rebound too slow (can\'t follow the road down). Topping out hard = rebound too fast, need more damping.',
   },
   washboard: {
     title: 'Washboard — resonance and packing test',
     what: 'Repeated bumps at fixed spacing. Critical test for rebound settings. If the suspension hasn\'t returned before the next hit arrives, it compresses from a deeper position each time — this is packing.',
     good: 'Travel chart stays flat and consistent (no trend up). Bike feels planted. Amplitude does not grow over time.',
-    try: 'Set Rebound to 30 clicks → watch chart climb each cycle. Increase Speed → find resonance where amplitude spikes. Set Rebound to 0 → chart stable but may chatter.',
+    try: 'Set Rebound to 0 clicks (full hard, slow return) → watch chart climb each cycle. Increase Speed → find resonance where amplitude spikes. Set Rebound to 30 out → stable but may chatter.',
     fix: 'Growing amplitude = rebound too slow. Persistent chattering = compression too stiff or rebound too fast. Match front/rear rebound so both end respond similarly.',
   },
   brake: {
@@ -164,8 +165,8 @@ const GUIDES = {
   },
   jump: {
     title: 'Jump Landing — impact absorption',
-    what: 'Free fall from height. On landing, kinetic energy (½mv²) is absorbed by both springs. From 1m drop: impact velocity ≈ 4.4 m/s. Both ends must compress simultaneously without bottoming.',
-    good: '1m drop: 60–80% travel, no bottoming. 2m drop: may need compression stiffening. Front and rear should compress by similar percentages.',
+    what: 'Free fall from height onto flat ground. In the air the suspension tops out; on landing, kinetic energy (½mv²) is absorbed by springs and dampers. From 1m: impact ≈ 4.4 m/s. The rider is modelled rigid — real riders absorb a lot with their legs.',
+    good: '0.3m drop: ~90% travel, no bottoming. Flat landings above ~0.5m bottom almost any stock ADV setup — that is realistic; riders land on downslopes for this reason. Front and rear should compress by similar percentages.',
     try: 'Soften compression → bottoming flag fires. Add Preload → less static sag = more travel reserve. Increase jump height gradually to find your setup\'s limit.',
     fix: 'Bottoming = stiffen compression, add preload, or fit heavier springs. One end bottoms before other = spring rates mismatched. Harsh landing through bars = compression too stiff.',
   },
@@ -182,7 +183,7 @@ const STOCK = {
   rider:85, pillion:0, luggage:0,
   fPre:0, fComp:15, fReb:15,
   rPre:0, rComp:15, rReb:15,
-  speed:10, bumpH:110, bumpL:1500, decel:1.0, jumpH:1.0,
+  speed:10, bumpH:110, bumpL:1500, decel:1.0, jumpH:0.4,
   scenario:'bump',
 };
 
@@ -239,7 +240,9 @@ function paramsFrom(st){
   const m_front_sprung = m_sprung * BIKE.biasF - (st.rider+st.pillion+st.luggage)*(riderBias-BIKE.biasF);
   const m_rear_sprung  = m_sprung - m_front_sprung;
   const kF = BIKE.fK, kR = BIKE.rK;
-  const clickFrac = c => c/30;
+  // Real clicker convention: clicks counted OUT from fully closed.
+  // 0 clicks = adjuster fully in = MAX damping; 30 clicks out = MIN damping.
+  const clickFrac = c => (30-c)/30;
   const lerp = (a,b,t)=> a+(b-a)*t;
   const cFcomp = lerp(BIKE.fCcompMin, BIKE.fCcompMax, clickFrac(st.fComp));
   const cFreb  = lerp(BIKE.fCrebMin,  BIKE.fCrebMax,  clickFrac(st.fReb));
@@ -304,14 +307,16 @@ function loads(t, p){
   if(!p) p = params();
   let Ff=0, Fr=0;
 
-  // Aerodynamic drag → weight transfer (pitches bike nose-down at all speeds)
-  // F_drag = ½ρ·CdA·v²; moment arm = hAero; transfers to front axle = F_drag·hAero/wb
+  // Aerodynamic drag → weight transfer. At constant speed, drag (backward, at
+  // hAero) is balanced by drive thrust (forward, at the rear contact patch);
+  // the couple pitches the bike nose-UP: rear loads, front unloads.
+  // F_drag = ½ρ·CdA·v²; transfer = F_drag·hAero/wb
   if (state.scenario !== 'static' && state.scenario !== 'jump') {
     const v = state.speed / 3.6;
     const Fdrag = 0.5 * BIKE.rhoAir * BIKE.CdA * v * v;
     const aeroWT = Fdrag * BIKE.hAero / BIKE.wb;
-    Ff += aeroWT;
-    Fr -= aeroWT;
+    Ff -= aeroWT;
+    Fr += aeroWT;
   }
 
   if (state.scenario === 'brake') {
@@ -326,7 +331,7 @@ function loads(t, p){
     // partially cancelling the rearward weight transfer. ~75% in 1st gear.
     Fr += dW * (1 - BIKE.antiSquatFrac);
   } else if (state.scenario === 'corner') {
-    const ay = state.decel * g;
+    const ay = state.decel * g * Math.min(1, t/0.2);
     const lean = Math.atan(ay/g);
     const extra = (1/Math.cos(lean) - 1) * p.m_total * g;
     Ff += extra * BIKE.biasF;
@@ -343,13 +348,22 @@ function stepWith(dt, simObj, p, sag){
   if(simObj.airborne){
     simObj.vAir+=g*dt; simObj.yAir-=simObj.vAir*dt;
     if(simObj.yAir<=0){
+      // Whole bike lands with downward velocity vAir (down-positive frame):
+      // wheels too, so the tire spring absorbs the initial spike realistically.
       simObj.zfV+=simObj.vAir; simObj.zrV+=simObj.vAir;
+      simObj.ztFv+=simObj.vAir; simObj.ztRv+=simObj.vAir;
       simObj.airborne=false; simObj.yAir=0;
     }
     simObj.t+=dt; return;
   }
   const ter=terrain(simObj.t);
   const ld=loads(simObj.t, p);
+
+  // terrain() is in the visual frame (positive = ground rises). The dynamics
+  // frame is compression-positive (zfDyn/zrDyn positive = sprung settles down,
+  // matching brake dive Ff>0 and jump landing +vAir), so terrain enters
+  // negated and ztF/ztR are down-positive too. Renderers draw wheels at -zt.
+  const yFt=-ter.yF, yRt=-ter.yR, yFvt=-ter.yFv, yRvt=-ter.yRv;
 
   // Suspension relative motion (sprung vs wheel)
   const crF=simObj.zfV-simObj.ztFv, crR=simObj.zrV-simObj.ztRv;
@@ -371,9 +385,9 @@ function stepWith(dt, simObj, p, sag){
   const aR=(-effKR*xR-FdR+ld.Fr)/p.m_rear_sprung;
 
   // Tire spring+damper forces on wheel (terrain→wheel)
-  const tireCrF=simObj.ztFv-ter.yFv, tireCrR=simObj.ztRv-ter.yRv;
-  const aTF=(p.kF*xF+FdF+BIKE.kTireF*(ter.yF-simObj.ztF)-BIKE.cTireF*tireCrF)/BIKE.mTireF;
-  const aTR=(effKR*xR+FdR+BIKE.kTireR*(ter.yR-simObj.ztR)-BIKE.cTireR*tireCrR)/BIKE.mTireR;
+  const tireCrF=simObj.ztFv-yFvt, tireCrR=simObj.ztRv-yRvt;
+  const aTF=(p.kF*xF+FdF+BIKE.kTireF*(yFt-simObj.ztF)-BIKE.cTireF*tireCrF)/BIKE.mTireF;
+  const aTR=(effKR*xR+FdR+BIKE.kTireR*(yRt-simObj.ztR)-BIKE.cTireR*tireCrR)/BIKE.mTireR;
 
   // Semi-implicit Euler
   simObj.zfV +=aF*dt;  simObj.zrV +=aR*dt;
@@ -416,16 +430,19 @@ function buildBumpData(st, sag){
     const xF=v*t-0.3*v, xR=xF-BIKE.wb;
     const yF=prof(xF),yR=prof(xR);
     const yvF=clamp(vel(xF),-2.5,2.5), yvR=clamp(vel(xR),-2.5,2.5);
+    // zF/zR = sprung heave (up-positive). Compression = sag + y - z, so the
+    // damper is in compression when crF = zvF - yvF < 0 (body falling vs road).
     const crF=zvF-yvF, crR=zvR-yvR;
-    const FdF=crF>0?dampForce(crF,cFc,cFc_h,BIKE.fLSCkneVel):dampForce(crF,cFr,cFr_h,BIKE.fLSCkneVel);
-    const FdR=crR>0?dampForce(crR,cRc,cRc_h,BIKE.rLSCkneVel):dampForce(crR,cRr,cRr_h,BIKE.rLSCkneVel);
+    const FdF=crF<0?dampForce(crF,cFc,cFc_h,BIKE.fLSCkneVel):dampForce(crF,cFr,cFr_h,BIKE.fLSCkneVel);
+    const FdR=crR<0?dampForce(crR,cRc,cRc_h,BIKE.rLSCkneVel):dampForce(crR,cRr,cRr_h,BIKE.rLSCkneVel);
     zvF+=((-kF*(zF-yF)-FdF)/mF)*dt; zF+=zvF*dt;
     zvR+=((-kR*(zR-yR)-FdR)/mR)*dt; zR+=zvR*dt;
-    const tvlF=clamp(sagF+zF,0,BIKE.fTravel), tvlR=clamp(sagR+zR,0,BIKE.rTravel);
-    if(sagF+zF<0){zF=-sagF;zvF=Math.max(0,zvF);}
-    if(sagF+zF>BIKE.fTravel){zF=BIKE.fTravel-sagF;zvF=Math.min(0,zvF);}
-    if(sagR+zR<0){zR=-sagR;zvR=Math.max(0,zvR);}
-    if(sagR+zR>BIKE.rTravel){zR=BIKE.rTravel-sagR;zvR=Math.min(0,zvR);}
+    const qF=sagF+yF-zF, qR=sagR+yR-zR;
+    const tvlF=clamp(qF,0,BIKE.fTravel), tvlR=clamp(qR,0,BIKE.rTravel);
+    if(qF<0){zF=sagF+yF; zvF=Math.min(zvF,yvF);}
+    if(qF>BIKE.fTravel){zF=sagF+yF-BIKE.fTravel; zvF=Math.max(zvF,yvF);}
+    if(qR<0){zR=sagR+yR; zvR=Math.min(zvR,yvR);}
+    if(qR>BIKE.rTravel){zR=sagR+yR-BIKE.rTravel; zvR=Math.max(zvR,yvR);}
     if(i%4===0) pts.push({t, f:tvlF/BIKE.fTravel, r:tvlR/BIKE.rTravel});
   }
   return {pts, sagF:sagF/BIKE.fTravel, sagR:sagR/BIKE.rTravel, mF, mR, kF, kR};
@@ -454,16 +471,18 @@ function buildIdealData(){
     const xF=v*t-0.3*v, xR=xF-BIKE.wb;
     const yF=prof(xF),yR=prof(xR);
     const yvF=clamp(vel(xF),-2.5,2.5), yvR=clamp(vel(xR),-2.5,2.5);
+    // Same compression-frame conventions as buildBumpData above.
     const crF=zvF-yvF, crR=zvR-yvR;
-    const FdF=crF>0?dampForce(crF,cFc,cFc_h,BIKE.fLSCkneVel):dampForce(crF,cFr,cFr_h,BIKE.fLSCkneVel);
-    const FdR=crR>0?dampForce(crR,cRc,cRc_h,BIKE.rLSCkneVel):dampForce(crR,cRr,cRr_h,BIKE.rLSCkneVel);
+    const FdF=crF<0?dampForce(crF,cFc,cFc_h,BIKE.fLSCkneVel):dampForce(crF,cFr,cFr_h,BIKE.fLSCkneVel);
+    const FdR=crR<0?dampForce(crR,cRc,cRc_h,BIKE.rLSCkneVel):dampForce(crR,cRr,cRr_h,BIKE.rLSCkneVel);
     zvF+=((-kF*(zF-yF)-FdF)/mF)*dt; zF+=zvF*dt;
     zvR+=((-kR*(zR-yR)-FdR)/mR)*dt; zR+=zvR*dt;
-    const tvlF=clamp(sagF+zF,0,BIKE.fTravel), tvlR=clamp(sagR+zR,0,BIKE.rTravel);
-    if(sagF+zF<0){zF=-sagF;zvF=Math.max(0,zvF);}
-    if(sagF+zF>BIKE.fTravel){zF=BIKE.fTravel-sagF;zvF=Math.min(0,zvF);}
-    if(sagR+zR<0){zR=-sagR;zvR=Math.max(0,zvR);}
-    if(sagR+zR>BIKE.rTravel){zR=BIKE.rTravel-sagR;zvR=Math.min(0,zvR);}
+    const qF=sagF+yF-zF, qR=sagR+yR-zR;
+    const tvlF=clamp(qF,0,BIKE.fTravel), tvlR=clamp(qR,0,BIKE.rTravel);
+    if(qF<0){zF=sagF+yF; zvF=Math.min(zvF,yvF);}
+    if(qF>BIKE.fTravel){zF=sagF+yF-BIKE.fTravel; zvF=Math.max(zvF,yvF);}
+    if(qR<0){zR=sagR+yR; zvR=Math.min(zvR,yvR);}
+    if(qR>BIKE.rTravel){zR=sagR+yR-BIKE.rTravel; zvR=Math.max(zvR,yvR);}
     if(i%4===0) pts.push({t, f:tvlF/BIKE.fTravel, r:tvlR/BIKE.rTravel});
   }
   return {pts, sagF:sagF/BIKE.fTravel, sagR:sagR/BIKE.rTravel};
@@ -507,7 +526,8 @@ function computeSpectrum(history, end){
 function idealSettings(){
   const tgt=SCENARIO_IDEAL[state.scenario]||SCENARIO_IDEAL.bump;
   const p=params();
-  const toClicks=(c,cMin,cMax)=>Math.round(Math.max(0,Math.min(30,30*(c-cMin)/(cMax-cMin))));
+  // Inverse of the click mapping: 0 clicks out = cMax, 30 clicks out = cMin
+  const toClicks=(c,cMin,cMax)=>Math.round(Math.max(0,Math.min(30,30*(cMax-c)/(cMax-cMin))));
   const fCompC=toClicks(tgt.zetaComp*2*Math.sqrt(BIKE.fK*p.m_front_sprung),BIKE.fCcompMin,BIKE.fCcompMax);
   const fRebC =toClicks(tgt.zetaReb *2*Math.sqrt(BIKE.fK*p.m_front_sprung),BIKE.fCrebMin, BIKE.fCrebMax);
   const rCompC=toClicks(tgt.zetaComp*2*Math.sqrt(BIKE.rK*p.m_rear_sprung), BIKE.rCcompMin,BIKE.rCcompMax);

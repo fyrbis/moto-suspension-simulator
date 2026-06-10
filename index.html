@@ -75,13 +75,13 @@
 
     <h3 id="lbl_front">Front · WP APEX 43mm</h3>
     <div class="ctrl"><label>Preload <span class="v" id="fPreV">0 mm</span></label><input type="range" id="fPre" min="0" max="15" step="1" value="0" title="Spring preload: spacer added to spring length. Raises bike, reduces sag, does NOT change stiffness. Add when too much sag for your weight."><div class="hint">Raises ride height · reduces sag · same spring rate</div></div>
-    <div class="ctrl"><label>Compression <span class="v" id="fCompV">15 clicks</span></label><input type="range" id="fComp" min="0" max="30" step="1" value="15" title="Compression damping: controls how fast the fork collapses on a hit. 30=hardest (stiff, less travel used, choppy on small bumps). 0=softest (more travel, smoother feel, risk of bottoming)."><div class="hint">30=hardest (less dive, choppy) · 0=softest (more travel, plush)</div></div>
-    <div class="ctrl"><label>Rebound <span class="v" id="fRebV">15 clicks</span></label><input type="range" id="fReb" min="0" max="30" step="1" value="15" title="Rebound damping: controls how fast the fork extends after compression. 30=slowest (packing risk on repeated bumps). 0=fastest (wheel chatters, loses traction)."><div class="hint">30=slowest return (packing) · 0=fastest (wheel chatter)</div></div>
+    <div class="ctrl"><label>Compression <span class="v" id="fCompV">15 clicks out</span></label><input type="range" id="fComp" min="0" max="30" step="1" value="15" title="Compression damping, counted in clicks OUT from fully closed. 0=hardest (stiff, less travel used, choppy on small bumps). 30=softest (more travel, smoother feel, risk of bottoming)."><div class="hint">0=hardest (less dive, choppy) · 30=softest (more travel, plush)</div></div>
+    <div class="ctrl"><label>Rebound <span class="v" id="fRebV">15 clicks out</span></label><input type="range" id="fReb" min="0" max="30" step="1" value="15" title="Rebound damping, clicks OUT from fully closed. 0=slowest return (packing risk on repeated bumps). 30=fastest (wheel chatters, loses traction)."><div class="hint">0=slowest return (packing) · 30=fastest (wheel chatter)</div></div>
 
     <h3 id="lbl_rear">Rear · WP APEX shock</h3>
     <div class="ctrl"><label>Preload <span class="v" id="rPreV">0 turns</span></label><input type="range" id="rPre" min="0" max="15" step="1" value="0" title="Rear spring preload: collar turns compress the spring pre-load. Use to restore correct sag when carrying luggage or pillion. Does not change spring rate."><div class="hint">Clockwise turns = more preload = less sag</div></div>
-    <div class="ctrl"><label>Compression <span class="v" id="rCompV">15 clicks</span></label><input type="range" id="rComp" min="0" max="30" step="1" value="15" title="Rear compression damping: how fast shock collapses under load. Stock Norden 901 has no external comp adjuster — this models an aftermarket or modified unit. 30=hardest, 0=softest."><div class="hint">30=hardest · 0=softest · (stock has no adjuster — modelled)</div></div>
-    <div class="ctrl"><label>Rebound <span class="v" id="rRebV">15 clicks</span></label><input type="range" id="rReb" min="0" max="30" step="1" value="15" title="Rear rebound damping: controls how fast shock extends. Too slow = rear packs down. Too fast = rear kicks up, skipping over bumps, loss of traction."><div class="hint">30=slowest (packs down) · 0=fastest (rear kick)</div></div>
+    <div class="ctrl"><label>Compression <span class="v" id="rCompV">15 clicks out</span></label><input type="range" id="rComp" min="0" max="30" step="1" value="15" title="Rear compression damping, clicks OUT from fully closed. Stock Norden 901 has no external comp adjuster — this models an aftermarket or modified unit. 0=hardest, 30=softest."><div class="hint">0=hardest · 30=softest · (stock has no adjuster — modelled)</div></div>
+    <div class="ctrl"><label>Rebound <span class="v" id="rRebV">15 clicks out</span></label><input type="range" id="rReb" min="0" max="30" step="1" value="15" title="Rear rebound damping, clicks OUT from fully closed. Too slow (0) = rear packs down. Too fast (30) = rear kicks up, skipping over bumps, loss of traction."><div class="hint">0=slowest (packs down) · 30=fastest (rear kick)</div></div>
 
     <div class="ctrl" style="margin-top:10px;">
       <label>Rear progression <span class="v" id="progressionV">0%</span></label>
@@ -188,15 +188,15 @@
     <details class="factory-ref" open>
       <summary>Factory Settings · WP APEX</summary>
       <div class="factory-body">
-        <p class="factory-note">Slider 30 = fully clockwise (hardest). Turn fully clockwise to start, then back off counter-clockwise. Factory counts clicks OUT from fully clockwise — shown as slider position below.</p>
+        <p class="factory-note">Sliders count clicks OUT from fully clockwise, exactly like the factory manual: 0 = fully closed (hardest), turn counter-clockwise to soften.</p>
         <table class="factory-tbl">
           <thead><tr><th></th><th>Comfort</th><th>Standard</th><th>Sport</th></tr></thead>
           <tbody>
-            <tr class="factory-section"><td colspan="4">Front Fork (WP APEX 43mm) · 30 clicks · slider position</td></tr>
-            <tr><td>Compression</td><td>10</td><td>15</td><td>20</td></tr>
-            <tr><td>Rebound</td><td>10</td><td>15</td><td>20</td></tr>
+            <tr class="factory-section"><td colspan="4">Front Fork (WP APEX 43mm) · 30 clicks · clicks out</td></tr>
+            <tr><td>Compression</td><td>20</td><td>15</td><td>10</td></tr>
+            <tr><td>Rebound</td><td>20</td><td>15</td><td>10</td></tr>
             <tr class="factory-section"><td colspan="4">Rear Shock (WP APEX) · 18 clicks rebound · slider position</td></tr>
-            <tr><td>Rebound</td><td>0</td><td>5</td><td>13</td></tr>
+            <tr><td>Rebound</td><td>20</td><td>15</td><td>10</td></tr>
             <tr class="factory-section"><td colspan="4">Rear Preload · hand-turn dial</td></tr>
             <tr><td>~80–85 kg rider</td><td colspan="3">8–12 turns clockwise from softest</td></tr>
           </tbody>
@@ -211,7 +211,7 @@
       <div class="explainer-body">
         <p><b>Spring (preload / stiffness)</b> — The spring supports your weight. <em>Sag</em> is how much it compresses at rest: target 30% for street ADV. Sag too high = spring too soft. Too low = too stiff or too much preload. Preload only shifts the equilibrium — it does NOT change spring rate or the feel over bumps.</p>
         <p><b>Compression damping</b> — Controls how fast the spring collapses when a wheel hits something. <em>Stiff compression</em> = less travel used per hit, but harsh feeling, small bumps transferred straight to chassis. <em>Soft compression</em> = spring uses full travel, smoother, but risk of bottoming on big hits.</p>
-        <p><b>Rebound damping</b> — Controls how fast the spring returns after compression. <em>Too slow (30 clicks)</em> = packing: each successive bump finds the suspension already partially compressed from the last hit. The bike sinks deeper each cycle. <em>Too fast (0 clicks)</em> = the wheel kicks back up hard, loses contact with ground, chatters. Correct rebound is the most critical setting for traction.</p>
+        <p><b>Rebound damping</b> — Controls how fast the spring returns after compression. <em>Too slow (0 clicks out)</em> = packing: each successive bump finds the suspension already partially compressed from the last hit. The bike sinks deeper each cycle. <em>Too fast (30 clicks out)</em> = the wheel kicks back up hard, loses contact with ground, chatters. Correct rebound is the most critical setting for traction.</p>
         <p><b>Natural frequency (fₙ)</b> — How fast the chassis bounces in Hz. ADV bike target: 1.5–2.5 Hz. Higher = stiffer ride, more feedback. Matching front and rear fₙ keeps the bike balanced over bumps.</p>
         <p><b>Damping ratio (ζ)</b> — 0 = no damping (bounces forever). 1 = critically damped (returns to rest without oscillating). Real bikes run 0.25–0.55. Too low = bouncy. Too high = harsh, wheel loses contact.</p>
         <p><b>Washboard resonance</b> — If bumps repeat at the same frequency as your suspension's natural frequency, amplitude grows each cycle. This is why correct rebound matters most on rough roads: if the suspension hasn't returned before the next hit, it packs progressively deeper.</p>
@@ -226,7 +226,7 @@
   <div class="ctrl" id="f_bumpH"><label>Bump height <span class="v" id="bumpHV">60 mm</span></label><input type="range" id="bumpH" min="5" max="300" step="5" value="60"></div>
   <div class="ctrl" id="f_bumpL"><label>Bump length <span class="v" id="bumpLV">300 mm</span></label><input type="range" id="bumpL" min="50" max="2000" step="50" value="300"></div>
   <div class="ctrl" id="f_decel"><label>Decel/Accel <span class="v" id="decelV">1.0 g</span></label><input type="range" id="decel" min="0.1" max="1.4" step="0.05" value="1.0"></div>
-  <div class="ctrl" id="f_jumpH"><label>Jump height <span class="v" id="jumpHV">1.0 m</span></label><input type="range" id="jumpH" min="0.1" max="3.0" step="0.1" value="1.0"></div>
+  <div class="ctrl" id="f_jumpH"><label>Jump height <span class="v" id="jumpHV">0.4 m</span></label><input type="range" id="jumpH" min="0.1" max="3.0" step="0.1" value="0.4"></div>
 </footer>
 
 <!-- Damping Analysis Modal -->

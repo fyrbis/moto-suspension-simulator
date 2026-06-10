@@ -45,6 +45,10 @@ Interactive 2D motorcycle suspension simulator for the Husqvarna Norden 901. One
 
 **Tires are modeled** as a real mass-spring-damper between wheel and terrain (`mTire*`, `kTire*`, `cTire*` in `BIKE`; wheel states `ztF`/`ztR` in `sim`). Suspension compression is always `zDyn - zt` (sprung minus wheel) — keep travel checks, displays, and the progressive-spring fraction in that frame, never `sag + zDyn` alone.
 
+**Sign conventions:** the dynamics frame is compression-positive (down): `zfDyn`/`ztF` positive = body/wheel moves down, so brake load `Ff>0` and jump landing `+vAir` compress. `terrain()` returns the *visual* frame (positive = ground rises) and is negated inside `stepWith`. Renderers therefore draw wheels at `-zt`. If you add a vertical quantity, decide its frame explicitly — a mixed frame silently swaps compression/rebound damping for terrain events (this bug existed and was fixed).
+
+**Click convention** matches real clickers: counted OUT from fully closed, 0 clicks = max damping, 30 = min (`clickFrac = (30-c)/30` in `paramsFrom`). Presets, guides, HTML hints, and `idealSettings()` all assume this direction.
+
 ## Calibration constants
 
 `BIKE` block at top of `<script>` holds all bike physics constants. These are **calibrated estimates**, not factory data — calibrated so stock + 85kg rider yields ~30% sag both ends and ζ ≈ 0.4. Changing `fK`/`rK` shifts sag immediately; verify `recomputeStatics()` still produces realistic numbers (sag 25-35%, fₙ 1.5-3 Hz, ζ 0.3-0.6) before committing.

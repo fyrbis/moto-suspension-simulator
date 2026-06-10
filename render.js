@@ -46,9 +46,10 @@ function drawBikeFull(ctx, cx, cy, scale, fComp, rComp, airborne, yAir, ter, sim
   const shakeF = fCompPct > 0.85 ? (Math.random()-0.5)*2.5*(fCompPct-0.85)*5 : 0;
   const shakeR = rCompPct > 0.85 ? (Math.random()-0.5)*2.5*(rCompPct-0.85)*5 : 0;
 
-  // Use actual wheel positions from tire dynamics (ztF/ztR); fall back to terrain for airborne/no-tire
-  const wYF = airborne ? air : (ter.ztF !== undefined ? ter.ztF : ter.yF);
-  const wYR = airborne ? air : (ter.ztR !== undefined ? ter.ztR : ter.yR);
+  // Use actual wheel positions from tire dynamics. ztF/ztR are down-positive
+  // (dynamics frame), so the visual height is -zt. Fallback: terrain height.
+  const wYF = airborne ? air : (ter.ztF !== undefined ? -ter.ztF : ter.yF);
+  const wYR = airborne ? air : (ter.ztR !== undefined ? -ter.ztR : ter.yR);
   const wfS = {sx: cx+xF*scale, sy: cy-(rWheelF+wYF)*scale + shakeF};
   const wrS = {sx: cx+xR*scale, sy: cy-(rWheelR+wYR)*scale + shakeR};
   if (airborne) { wfS.sy = cy-(rWheelF+air)*scale; wrS.sy = cy-(rWheelR+air)*scale; }
@@ -583,8 +584,8 @@ function draw(){
 
   // DOM TELEMETRY
   const forkLenU = BIKE.forkLenU, rearArmU = BIKE.rearArmU;
-  const frFy = BIKE.rWheelF + sim.ztF + (forkLenU - fComp) * Math.cos(BIKE.rake);
-  const frRy = BIKE.rWheelR + sim.ztR + rearArmU - rComp;
+  const frFy = BIKE.rWheelF - sim.ztF + (forkLenU - fComp) * Math.cos(BIKE.rake);
+  const frRy = BIKE.rWheelR - sim.ztR + rearArmU - rComp;
   $('m_fTrav').textContent = `${(fComp*1000).toFixed(0)}/${(BIKE.fTravel*1000).toFixed(0)} mm`;
   $('m_rTrav').textContent = `${(rComp*1000).toFixed(0)}/${(BIKE.rTravel*1000).toFixed(0)} mm`;
   const pitchDeg = Math.atan2((frRy-frFy), BIKE.wb)*180/Math.PI;

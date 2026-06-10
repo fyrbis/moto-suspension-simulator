@@ -79,7 +79,7 @@ function diagnose(){
   const zRreb =p.cRreb /(2*Math.sqrt(BIKE.rK*p.m_rear_sprung));
   const peakG=sim.peakA/g;
   const fComp=Math.max(0,staticSag.f+sim.zfDyn-sim.ztF), rComp=Math.max(0,staticSag.r+sim.zrDyn-sim.ztR);
-  const pitchDeg=Math.atan2((BIKE.rWheelR+sim.ztR+BIKE.rearArmU-rComp)-(BIKE.rWheelF+sim.ztF+(BIKE.forkLenU-fComp)*Math.cos(BIKE.rake)),BIKE.wb)*180/Math.PI;
+  const pitchDeg=Math.atan2((BIKE.rWheelR-sim.ztR+BIKE.rearArmU-rComp)-(BIKE.rWheelF-sim.ztF+(BIKE.forkLenU-fComp)*Math.cos(BIKE.rake)),BIKE.wb)*180/Math.PI;
   const msgs=[];
 
   if(sagFpct>42)       msgs.push({c:'#ff8a00',t:'Front sag >42% — add preload or fit stiffer spring.'});
@@ -88,8 +88,8 @@ function diagnose(){
   else if(sagRpct<22)  msgs.push({c:'#ffe300',t:'Rear sag <22% — too much preload or spring too stiff.'});
 
   if(sim.bottom){
-    if(fComp/BIKE.fTravel>0.90) msgs.push({c:'#ff3b30',t:'⚠ Front bottoming — increase F compression clicks or add preload.'});
-    if(rComp/BIKE.rTravel>0.90) msgs.push({c:'#ff3b30',t:'⚠ Rear bottoming — increase R compression clicks or add preload.'});
+    if(fComp/BIKE.fTravel>0.90) msgs.push({c:'#ff3b30',t:'⚠ Front bottoming — turn F compression clicks in (toward 0) or add preload.'});
+    if(rComp/BIKE.rTravel>0.90) msgs.push({c:'#ff3b30',t:'⚠ Rear bottoming — turn R compression clicks in (toward 0) or add preload.'});
   }
   if(sim.t>0.3 && !sim.airborne){
     if(fComp/BIKE.fTravel<0.18 && sagFpct<35) msgs.push({c:'#ffe300',t:'Front barely uses travel — compression too stiff for this scenario.'});
@@ -124,10 +124,11 @@ function setTileColor(id, value, [lo_bad, lo_warn, hi_warn, hi_bad]){
 }
 
 /* ---------- Simulation state ---------- */
-// z = sprung displacement from free length (positive = compressed downward from natural)
-// Reference frame: equilibrium under gravity = (m*g - Fpre)/k. We integrate around that.
-// y = terrain input (positive = ground rises)
-// For animation: travel_used = z_eq + dz - y, where dz is dynamic offset from equilibrium.
+// Dynamics frame is compression-positive (down): zfDyn/zrDyn positive = sprung
+// settles toward the wheel; ztF/ztR positive = wheel moves down. We integrate
+// around the gravity equilibrium (m*g - Fpre)/k, so gravity does not appear.
+// terrain() is visual-frame (positive = ground rises) and enters stepWith negated.
+// Suspension travel used = staticSag + zDyn - zt; renderers draw wheels at -zt.
 let sim = {
   t: 0,
   zfDyn: 0, zfV: 0,
@@ -161,7 +162,8 @@ function resetSim2(){
   sim2.Fdyn_front=sim2.Fdyn_rear=0;
   sim2.airborne=false; sim2.vAir=0; sim2.yAir=0;
   sim2.history.length=0; sim2.peakA=0; sim2.lastA=0; sim2.bottom=false; sim2.done=false;
-  if(state.scenario==='jump'){ sim2.airborne=true; sim2.yAir=state.jumpH; sim2.vAir=0; }
+  if(state.scenario==='jump'){ sim2.airborne=true; sim2.yAir=state.jumpH; sim2.vAir=0;
+    sim2.zfDyn=-staticSag2.f; sim2.zrDyn=-staticSag2.r; }
 }
 
 function resetSim(){
@@ -181,6 +183,9 @@ function resetSim(){
     sim.airborne = true;
     sim.yAir = state.jumpH;
     sim.vAir = 0;
+    // In the air the suspension tops out (no load): full travel available on landing
+    sim.zfDyn = -staticSag.f;
+    sim.zrDyn = -staticSag.r;
   }
   // Keep sim2 time-locked to sim1 so both sims see the same terrain position
   if (compareMode) resetSim2();
@@ -194,11 +199,11 @@ const inputs = {
   pillion:[$('pillion'),$('pillionV'),v=>`${v} kg`],
   luggage:[$('luggage'),$('luggageV'),v=>`${v} kg`],
   fPre:[$('fPre'),$('fPreV'),v=>`${v} mm`],
-  fComp:[$('fComp'),$('fCompV'),v=>`${v} clicks`],
-  fReb:[$('fReb'),$('fRebV'),v=>`${v} clicks`],
+  fComp:[$('fComp'),$('fCompV'),v=>`${v} clicks out`],
+  fReb:[$('fReb'),$('fRebV'),v=>`${v} clicks out`],
   rPre:[$('rPre'),$('rPreV'),v=>`${v} turns`],
-  rComp:[$('rComp'),$('rCompV'),v=>`${v} clicks`],
-  rReb:[$('rReb'),$('rRebV'),v=>`${v} clicks`],
+  rComp:[$('rComp'),$('rCompV'),v=>`${v} clicks out`],
+  rReb:[$('rReb'),$('rRebV'),v=>`${v} clicks out`],
   speed:[$('speed'),$('speedV'),v=>`${v} km/h`],
   bumpH:[$('bumpH'),$('bumpHV'),v=>`${v} mm`],
   bumpL:[$('bumpL'),$('bumpLV'),v=>`${v} mm`],
@@ -376,10 +381,11 @@ function loop(now){
     const rUse = Math.max(0, staticSag.r + sim.zrDyn - sim.ztR) / BIKE.rTravel;
     const forkLenU=BIKE.forkLenU, rearArmU=BIKE.rearArmU;
     const _fC=Math.max(0,staticSag.f+sim.zfDyn-sim.ztF), _rC=Math.max(0,staticSag.r+sim.zrDyn-sim.ztR);
-    const frFy=BIKE.rWheelF+sim.ztF+(forkLenU-_fC)*Math.cos(BIKE.rake);
-    const frRy=BIKE.rWheelR+sim.ztR+rearArmU-_rC;
+    const frFy=BIKE.rWheelF-sim.ztF+(forkLenU-_fC)*Math.cos(BIKE.rake);
+    const frRy=BIKE.rWheelR-sim.ztR+rearArmU-_rC;
     const pitchNow=Math.atan2(frRy-frFy,BIKE.wb)*180/Math.PI;
-    sim.history.push({t:sim.t, f:fUse, r:rUse, g:(sim.lastA||0)/g, pitch:pitchNow, fv:sim.zfV, rv:sim.zrV,
+    // fv/rv = suspension compression rate (sprung minus wheel) for phase plots
+    sim.history.push({t:sim.t, f:fUse, r:rUse, g:(sim.lastA||0)/g, pitch:pitchNow, fv:sim.zfV-sim.ztFv, rv:sim.zrV-sim.ztRv,
       zfDyn:sim.zfDyn, zrDyn:sim.zrDyn, ztF:sim.ztF, ztR:sim.ztR, airborne:sim.airborne});
     if (sim.history.length > 600) sim.history.shift();
     if (!scrubbing) {
@@ -397,6 +403,9 @@ function loop(now){
         sim.airborne = true;
         sim.yAir = state.jumpH;
         sim.vAir = 0;
+        sim.zfDyn = -staticSag.f; sim.zrDyn = -staticSag.r;
+        sim.zfV = sim.zrV = 0;
+        sim.ztF = sim.ztFv = sim.ztR = sim.ztRv = 0;
         sim.timeOnGround = 0;
         $('bottomFlag').classList.remove('on');
         sim.bottom = false;
@@ -416,10 +425,10 @@ function loop(now){
       const fUse2=Math.max(0,staticSag2.f+sim2.zfDyn-sim2.ztF)/BIKE.fTravel;
       const rUse2=Math.max(0,staticSag2.r+sim2.zrDyn-sim2.ztR)/BIKE.rTravel;
       const fComp2_s=Math.max(0,staticSag2.f+sim2.zfDyn-sim2.ztF), rComp2_s=Math.max(0,staticSag2.r+sim2.zrDyn-sim2.ztR);
-      const frFy2=BIKE.rWheelF+sim2.ztF+(BIKE.forkLenU-fComp2_s)*Math.cos(BIKE.rake);
-      const frRy2=BIKE.rWheelR+sim2.ztR+BIKE.rearArmU-rComp2_s;
+      const frFy2=BIKE.rWheelF-sim2.ztF+(BIKE.forkLenU-fComp2_s)*Math.cos(BIKE.rake);
+      const frRy2=BIKE.rWheelR-sim2.ztR+BIKE.rearArmU-rComp2_s;
       const pitch2=Math.atan2(frRy2-frFy2,BIKE.wb)*180/Math.PI;
-      sim2.history.push({t:sim2.t, f:fUse2, r:rUse2, g:(sim2.lastA||0)/g, pitch:pitch2, fv:sim2.zfV, rv:sim2.zrV});
+      sim2.history.push({t:sim2.t, f:fUse2, r:rUse2, g:(sim2.lastA||0)/g, pitch:pitch2, fv:sim2.zfV-sim2.ztFv, rv:sim2.zrV-sim2.ztRv});
       if(sim2.history.length>600) sim2.history.shift();
     }
   }
@@ -507,11 +516,11 @@ document.addEventListener('DOMContentLoaded',()=>{
     ['pillion', 'ma_pillion', 'ma_pillionV', v=>`${v} kg`],
     ['luggage', 'ma_luggage', 'ma_luggageV', v=>`${v} kg`],
     ['fPre',    'ma_fPre',    'ma_fPreV',    v=>`${v} mm`],
-    ['fComp',   'ma_fComp',   'ma_fCompV',   v=>`${v} clicks`],
-    ['fReb',    'ma_fReb',    'ma_fRebV',    v=>`${v} clicks`],
+    ['fComp',   'ma_fComp',   'ma_fCompV',   v=>`${v} clicks out`],
+    ['fReb',    'ma_fReb',    'ma_fRebV',    v=>`${v} clicks out`],
     ['rPre',    'ma_rPre',    'ma_rPreV',    v=>`${v} turns`],
-    ['rComp',   'ma_rComp',   'ma_rCompV',   v=>`${v} clicks`],
-    ['rReb',    'ma_rReb',    'ma_rRebV',    v=>`${v} clicks`],
+    ['rComp',   'ma_rComp',   'ma_rCompV',   v=>`${v} clicks out`],
+    ['rReb',    'ma_rReb',    'ma_rRebV',    v=>`${v} clicks out`],
     ['speed',   'ma_speed',   'ma_speedV',   v=>`${v} km/h`],
     ['bumpH',   'ma_bumpH',   'ma_bumpHV',   v=>`${v} mm`],
     ['bumpL',   'ma_bumpL',   'ma_bumpLV',   v=>`${v} mm`],
