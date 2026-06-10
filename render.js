@@ -122,18 +122,43 @@ function drawBikeFull(ctx, cx, cy, scale, fComp, rComp, airborne, yAir, ter, sim
   ctx.strokeStyle = '#3a3e48'; ctx.lineWidth = 2.5;
   ctx.beginPath(); ctx.arc(wrS.sx, wrS.sy, sprR, 0, Math.PI*2); ctx.stroke();
 
-  // REAR SHOCK — bottom eye on the swingarm 30% out from the pivot (visual
-  // motion ratio ≈ 3:1 like the real linkage), top on the frame under the seat.
-  const shockBx = swPivSx + (wrS.sx - swPivSx)*0.30;
-  const shockBy = swPivSy + (wrS.sy - swPivSy)*0.30;
-  const shockTx = swPivSx + 0.03*scale;
-  const shockTy = frRS.sy + 0.09*scale;
-  // Linkage hint: short link from the pivot area to the shock bottom eye
-  ctx.strokeStyle = '#404550'; ctx.lineWidth = 4;
-  ctx.beginPath(); ctx.moveTo(swPivSx + 0.012*scale, swPivSy + 0.018*scale);
-  ctx.lineTo(shockBx, shockBy + 3); ctx.stroke();
-  ctx.fillStyle = '#5a5e68';
-  ctx.beginPath(); ctx.arc(shockBx, shockBy + 2, 3, 0, Math.PI*2); ctx.fill();
+  // REAR LINKAGE — real Norden 901 architecture: the swingarm's underside eye
+  // (A) drives a rocker/bell-crank below the arm; a dog-bone link ties the
+  // rocker to a frame lower bracket (F); the WP XPLOR shock clevis (C) rises
+  // from the rocker to a lug on the frame spine above the swingarm.
+  const armVx = wrS.sx - swPivSx, armVy = wrS.sy - swPivSy;
+  const armL2 = Math.hypot(armVx, armVy) || 1;
+  // Downward (on-screen) normal to the arm, robust to arm angle sign
+  let anx = -armVy/armL2, any = armVx/armL2;
+  if (any < 0){ anx = -anx; any = -any; }
+  // A: linkage eye on the swingarm underside, ~35% out from the pivot
+  const Ax = swPivSx + armVx*0.35 + anx*7, Ay = swPivSy + armVy*0.35 + any*7;
+  // F: frame lower bracket (sprung side, below/behind the pivot)
+  const Fx = swPivSx - 0.025*scale, Fy = swPivSy + 0.085*scale;
+  // C: rocker clevis for the shock, below-rear of A
+  const Cx = Ax + 0.018*scale, Cy = Ay + 0.030*scale;
+  // B: rocker front corner, joined to F by the dog-bone link
+  const Bx = (Ax + Cx)/2 - 0.020*scale, By = (Ay + Cy)/2 + 0.012*scale;
+  // Frame lower bracket strut down from the pivot housing
+  ctx.strokeStyle = '#2e323c'; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(swPivSx - 0.004*scale, swPivSy + 0.012*scale);
+  ctx.lineTo(Fx, Fy); ctx.stroke();
+  // Dog-bone link
+  ctx.strokeStyle = '#3a3f4a'; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(Fx, Fy); ctx.lineTo(Bx, By); ctx.stroke();
+  // Rocker plate (triangle A-B-C)
+  ctx.fillStyle = '#454a56'; ctx.strokeStyle = '#23262e'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(Ax, Ay); ctx.lineTo(Bx, By); ctx.lineTo(Cx, Cy);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  // Pivot bolts
+  ctx.fillStyle = '#6a6e78';
+  for (const [bx, by] of [[Ax, Ay], [Bx, By], [Cx, Cy], [Fx, Fy]]){
+    ctx.beginPath(); ctx.arc(bx, by, 2.5, 0, Math.PI*2); ctx.fill();
+  }
+  // Shock endpoints: clevis on the rocker → lug on the frame spine
+  const shockBx = Cx, shockBy = Cy;
+  const shockTx = swPivSx + 0.015*scale;
+  const shockTy = frRS.sy - 0.02*scale;
   const shockBodyCol = rCompPct > 0.85 ? '#ff3b30' : rCompPct > 0.65 ? '#a02800' : '#2a2e38';
   const springCol    = rCompPct > 0.85 ? '#ff3b30' : rCompPct > 0.65 ? '#ff8a00' : '#a8aebc';
 
