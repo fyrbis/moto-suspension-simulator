@@ -298,6 +298,14 @@ function drawBikeFull(ctx, cx, cy, scale, fComp, rComp, airborne, yAir, ter, sim
   // End cap
   ctx.fillStyle = '#0c0d11';
   ctx.beginPath(); ctx.arc(sil2.x, sil2.y, 6, 0, Math.PI*2); ctx.fill();
+  // Mounting strap to the subframe (visually anchors the can to the tail)
+  const strapT = pt(0.80,-0.05*scale);
+  const strapFr = (0.80-0.62)/0.28;
+  const strapB = { x: sil1.x+(sil2.x-sil1.x)*strapFr, y: sil1.y+(sil2.y-sil1.y)*strapFr };
+  ctx.strokeStyle = '#2e323c'; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(strapT.x, strapT.y); ctx.lineTo(strapB.x, strapB.y); ctx.stroke();
+  ctx.strokeStyle = '#454a55'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(strapB.x - 6, strapB.y - 5); ctx.lineTo(strapB.x + 6, strapB.y + 5); ctx.stroke();
 
   // CLUTCH COVER — round case low on the engine side
   const cc = pt(0.49,-0.30*scale);
