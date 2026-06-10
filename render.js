@@ -138,7 +138,7 @@ function drawBikeFull(ctx, cx, cy, scale, fComp, rComp, airborne, yAir, ter, sim
   const springCol    = rCompPct > 0.85 ? '#ff3b30' : rCompPct > 0.65 ? '#ff8a00' : '#a8aebc';
 
   // Pre-compute shock axis for reservoir and coil placement
-  const shLen = Math.hypot(shockTx-shockBx, shockTy-shockBy);
+  const shLen = Math.hypot(shockTx-shockBx, shockTy-shockBy) || 1;
   const shUx = (shockTx-shockBx)/shLen, shUy = (shockTy-shockBy)/shLen;
   const shNx = -shUy, shNy = shUx;
 
@@ -634,6 +634,8 @@ function drawBikeFull(ctx, cx, cy, scale, fComp, rComp, airborne, yAir, ter, sim
   ctx.restore();
 }
 
+let camY = 0, camY2 = 0;   // smoothed vertical camera offsets (m) — follow big air
+
 function draw(){
   const {w,h} = fitCanvas(cv);
   ctx.clearRect(0,0,w,h);
@@ -643,16 +645,30 @@ function draw(){
   const scale = Math.min(w / 2.6, h / 2.2, 520);
   const cx = w/2, cy = h*0.80;
 
+  // Camera follow: when the bike launches higher than the headroom (big air
+  // off a bump, or a tall jump drop), pan up so it stays in frame.
+  const bodyH = sim.airborne ? sim.yAir : Math.max(0, -(sim.zfDyn + sim.zrDyn)/2);
+  const camTarget = Math.max(0, bodyH + 1.45 - cy/scale);
+  camY += (camTarget - camY) * 0.12;
+  if (camY < 0.001) camY = 0;
+  const cyV = cy + camY*scale;
+
   const ter = terrain(sim.t);
   ter.ztF = sim.ztF; ter.ztR = sim.ztR;
-  drawTerrain(ctx, cx, cy, scale, w, ter);
+  drawTerrain(ctx, cx, cyV, scale, w, ter);
 
   // Actual fork/shock travel = sprung displacement minus tire deflection
   const fComp = Math.max(0, staticSag.f + sim.zfDyn - sim.ztF);
   const rComp = Math.max(0, staticSag.r + sim.zrDyn - sim.ztR);
 
-  drawBikeFull(ctx, cx, cy, scale, fComp, rComp, sim.airborne, sim.yAir, ter, sim.t,
+  drawBikeFull(ctx, cx, cyV, scale, fComp, rComp, sim.airborne, sim.yAir, ter, sim.t,
     {frame: '#f5d800', helmet: '#d07000'});
+
+  // Altitude readout while the camera is panned up
+  if (camY > 0.05){
+    ctx.fillStyle = '#ffe300'; ctx.font = 'bold 11px ui-monospace,monospace'; ctx.textAlign = 'right';
+    ctx.fillText(`▲ ${bodyH.toFixed(1)} m air`, w - 12, 34);
+  }
 
   drawTravelBar(ctx, 30, h-50, 200, 14, fComp/BIKE.fTravel, 'Front', '#ffe300');
   drawTravelBar(ctx, 30, h-30, 200, 14, rComp/BIKE.rTravel, 'Rear',  '#ff8a00');
@@ -689,12 +705,18 @@ function drawGhost(){
   const hInner = h - 18;
   const scale = Math.min(w/2.6, hInner/2.2, 520);
   const cx = w/2, cy = 18 + hInner*0.80;
+  // Camera follow for Sim B (same logic as the main stage)
+  const bodyH2 = sim2.airborne ? sim2.yAir : Math.max(0, -(sim2.zfDyn + sim2.zrDyn)/2);
+  const camT2 = Math.max(0, bodyH2 + 1.45 - (cy-18)/scale);
+  camY2 += (camT2 - camY2) * 0.12;
+  if (camY2 < 0.001) camY2 = 0;
+  const cyV2 = cy + camY2*scale;
   const ter = terrain(sim2.t);
   ter.ztF = sim2.ztF; ter.ztR = sim2.ztR;
-  drawTerrain(ghostCtx, cx, cy, scale, w, ter);
+  drawTerrain(ghostCtx, cx, cyV2, scale, w, ter);
   const fComp2 = Math.max(0, staticSag2.f + sim2.zfDyn - sim2.ztF);
   const rComp2 = Math.max(0, staticSag2.r + sim2.zrDyn - sim2.ztR);
-  drawBikeFull(ghostCtx, cx, cy, scale, fComp2, rComp2, sim2.airborne, sim2.yAir, ter, sim2.t,
+  drawBikeFull(ghostCtx, cx, cyV2, scale, fComp2, rComp2, sim2.airborne, sim2.yAir, ter, sim2.t,
     {frame: '#4fc3f7', helmet: '#4fc3f7', showDebug: false});
   drawTravelBar(ghostCtx, 10, h-30, 150, 10, fComp2/BIKE.fTravel, 'F', '#4fc3f7');
   drawTravelBar(ghostCtx, 10, h-16, 150, 10, rComp2/BIKE.rTravel, 'R', '#80deea');

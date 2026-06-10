@@ -384,10 +384,20 @@ function stepWith(dt, simObj, p, sag){
   const aF=(-p.kF*xF-FdF+ld.Ff)/p.m_front_sprung;
   const aR=(-effKR*xR-FdR+ld.Fr)/p.m_rear_sprung;
 
-  // Tire spring+damper forces on wheel (terrain→wheel)
+  // Tire spring+damper forces on wheel (terrain→wheel). Ground contact is
+  // unilateral: it can push the wheel but never pull it. The offset-frame tire
+  // term is the deviation from the static contact force, so total upward force
+  // = F_static - term; when term would exceed F_static the wheel lifts off and
+  // the term is clamped there (total ground force = 0, wheel free-falls).
+  // This is what lets the bike genuinely jump off large bumps at speed.
   const tireCrF=simObj.ztFv-yFvt, tireCrR=simObj.ztRv-yRvt;
-  const aTF=(p.kF*xF+FdF+BIKE.kTireF*(yFt-simObj.ztF)-BIKE.cTireF*tireCrF)/BIKE.mTireF;
-  const aTR=(effKR*xR+FdR+BIKE.kTireR*(yRt-simObj.ztR)-BIKE.cTireR*tireCrR)/BIKE.mTireR;
+  const FstF=(p.m_front_sprung+BIKE.mTireF)*g, FstR=(p.m_rear_sprung+BIKE.mTireR)*g;
+  let tireTermF=BIKE.kTireF*(yFt-simObj.ztF)-BIKE.cTireF*tireCrF;
+  let tireTermR=BIKE.kTireR*(yRt-simObj.ztR)-BIKE.cTireR*tireCrR;
+  if(tireTermF>FstF) tireTermF=FstF;   // front wheel airborne
+  if(tireTermR>FstR) tireTermR=FstR;   // rear wheel airborne
+  const aTF=(p.kF*xF+FdF+tireTermF)/BIKE.mTireF;
+  const aTR=(effKR*xR+FdR+tireTermR)/BIKE.mTireR;
 
   // Semi-implicit Euler
   simObj.zfV +=aF*dt;  simObj.zrV +=aR*dt;
@@ -404,6 +414,25 @@ function stepWith(dt, simObj, p, sag){
   if(tR<0){simObj.zrDyn=simObj.ztR-sag.r; if(simObj.zrV<simObj.ztRv) simObj.zrV=simObj.ztRv;}
   if(tF>BIKE.fTravel){simObj.zfDyn=simObj.ztF+BIKE.fTravel-sag.f; if(simObj.zfV>simObj.ztFv) simObj.zfV=simObj.ztFv;}
   if(tR>BIKE.rTravel){simObj.zrDyn=simObj.ztR+BIKE.rTravel-sag.r; if(simObj.zrV>simObj.ztRv) simObj.zrV=simObj.ztRv;}
+
+  // Chassis rigidity: the two quarter-cars are ends of ONE rigid frame, so
+  // front/rear sprung heave cannot separate beyond ~15° of pitch. Without
+  // this, both ends fly independent ballistic arcs when the bike jumps and
+  // the rendered bike tears apart. The stop is momentum-conserving: the
+  // leading end carries the other with it (positions shifted mass-weighted
+  // around the CoM, separating relative velocity removed).
+  const maxDz = BIKE.wb * 0.27;   // ≈ tan(15°)
+  const dzPitch = simObj.zfDyn - simObj.zrDyn;
+  if (Math.abs(dzPitch) > maxDz){
+    const mF=p.m_front_sprung, mR=p.m_rear_sprung, M=mF+mR;
+    const excess = dzPitch - Math.sign(dzPitch)*maxDz;
+    simObj.zfDyn -= excess*mR/M;
+    simObj.zrDyn += excess*mF/M;
+    if ((simObj.zfV - simObj.zrV) * dzPitch > 0){
+      const vCom = (mF*simObj.zfV + mR*simObj.zrV)/M;
+      simObj.zfV = vCom; simObj.zrV = vCom;
+    }
+  }
 
   const aMag=Math.max(Math.abs(aF),Math.abs(aR));
   simObj.lastA=aMag;
