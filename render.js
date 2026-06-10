@@ -226,27 +226,6 @@ function drawBikeFull(ctx, cx, cy, scale, fComp, rComp, airborne, yAir, ter, sim
     }
   }
 
-  // HIGH RALLY FRONT FENDER — attached ~20% up the fork axis from axle
-  const t_fend = 0.20;
-  const fendCX = wfS.sx + (frFS.sx - wfS.sx) * t_fend;
-  const fendCY = wfS.sy + (frFS.sy - wfS.sy) * t_fend + 0.025*scale;
-  const fendW = rWheelF * scale * 1.15;
-  ctx.fillStyle = '#e8e8ec'; ctx.strokeStyle = '#1a1c22'; ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.moveTo(fendCX - fendW*0.55, fendCY);
-  ctx.quadraticCurveTo(fendCX, fendCY - 0.05*scale, fendCX + fendW*0.55, fendCY);
-  ctx.lineTo(fendCX + fendW*0.5, fendCY + 0.025*scale);
-  ctx.quadraticCurveTo(fendCX, fendCY - 0.025*scale, fendCX - fendW*0.5, fendCY + 0.025*scale);
-  ctx.closePath(); ctx.fill(); ctx.stroke();
-  // Blue stripe on fender (Norden livery)
-  ctx.fillStyle = '#1e5a9e';
-  ctx.beginPath();
-  ctx.moveTo(fendCX - fendW*0.5, fendCY + 0.005*scale);
-  ctx.quadraticCurveTo(fendCX, fendCY - 0.038*scale, fendCX + fendW*0.5, fendCY + 0.005*scale);
-  ctx.lineTo(fendCX + fendW*0.45, fendCY + 0.015*scale);
-  ctx.quadraticCurveTo(fendCX, fendCY - 0.025*scale, fendCX - fendW*0.45, fendCY + 0.015*scale);
-  ctx.closePath(); ctx.fill();
-
   // FRAME backbone — head to subframe tail. Tail sits just above the rear
   // frame anchor so the backbone runs nearly level (~0.80m) like the real bike.
   const headX = stTopX, headY = stTopY;
