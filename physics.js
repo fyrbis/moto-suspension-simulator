@@ -363,7 +363,7 @@ function stepWith(dt, simObj, p, sag){
 
   // Progressive rear spring (front is linear) — uses per-sim progression from p
   const progFrac=(p.progression||0)/100;
-  const rTravNow=Math.max(0, sag.r+simObj.zrDyn)/BIKE.rTravel;
+  const rTravNow=Math.max(0, sag.r+simObj.zrDyn-simObj.ztR)/BIKE.rTravel;
   const effKR=p.kR*(1+progFrac*rTravNow);
 
   // Sprung mass accelerations
@@ -381,13 +381,15 @@ function stepWith(dt, simObj, p, sag){
   simObj.zfDyn+=simObj.zfV*dt;  simObj.zrDyn+=simObj.zrV*dt;
   simObj.ztF  +=simObj.ztFv*dt; simObj.ztR  +=simObj.ztRv*dt;
 
-  // Travel limits (based on sprung displacement; tire deflection is small)
-  const tF=sag.f+simObj.zfDyn, tR=sag.r+simObj.zrDyn;
+  // Travel limits use suspension compression (sprung minus wheel), same frame
+  // as the spring force xF/xR and the UI travel display. At a stop the sprung
+  // and wheel move together, so velocities are matched rather than zeroed.
+  const tF=sag.f+simObj.zfDyn-simObj.ztF, tR=sag.r+simObj.zrDyn-simObj.ztR;
   if(tF>BIKE.fTravel||tR>BIKE.rTravel) simObj.bottom=true;
-  if(tF<0){simObj.zfDyn=-sag.f; simObj.zfV=Math.max(0,simObj.zfV); simObj.ztFv=0;}
-  if(tR<0){simObj.zrDyn=-sag.r; simObj.zrV=Math.max(0,simObj.zrV); simObj.ztRv=0;}
-  if(tF>BIKE.fTravel){simObj.zfDyn=BIKE.fTravel-sag.f; simObj.zfV=Math.min(0,simObj.zfV); simObj.ztFv=0;}
-  if(tR>BIKE.rTravel){simObj.zrDyn=BIKE.rTravel-sag.r; simObj.zrV=Math.min(0,simObj.zrV); simObj.ztRv=0;}
+  if(tF<0){simObj.zfDyn=simObj.ztF-sag.f; if(simObj.zfV<simObj.ztFv) simObj.zfV=simObj.ztFv;}
+  if(tR<0){simObj.zrDyn=simObj.ztR-sag.r; if(simObj.zrV<simObj.ztRv) simObj.zrV=simObj.ztRv;}
+  if(tF>BIKE.fTravel){simObj.zfDyn=simObj.ztF+BIKE.fTravel-sag.f; if(simObj.zfV>simObj.ztFv) simObj.zfV=simObj.ztFv;}
+  if(tR>BIKE.rTravel){simObj.zrDyn=simObj.ztR+BIKE.rTravel-sag.r; if(simObj.zrV>simObj.ztRv) simObj.zrV=simObj.ztRv;}
 
   const aMag=Math.max(Math.abs(aF),Math.abs(aR));
   simObj.lastA=aMag;

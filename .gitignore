@@ -1,0 +1,10 @@
+# Headless-browser verification logs
+.gstack/
+
+# Dev scratch screenshots
+_*.png
+
+# Downloaded installers
+*.deb
+
+node_modules/

@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Norden 901 · Diagram View</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #0a0b0e; color: #c8ccd8;
+  font-family: ui-monospace, 'Cascadia Code', monospace;
+  height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+}
+header {
+  flex-shrink: 0; background: #0f1116; border-bottom: 1px solid #1e2130;
+  padding: 7px 14px; display: flex; flex-direction: column; gap: 6px;
+}
+.hrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sep  { width: 1px; height: 20px; background: #1e2130; flex-shrink: 0; }
+h1    { font-size: 13px; font-weight: 700; color: #ffe300; white-space: nowrap; }
+h1 span { color: #888; font-weight: 400; font-size: 11px; margin-left: 6px; }
+select, button {
+  background: #181b24; color: #c8ccd8; border: 1px solid #2a2e3c;
+  border-radius: 4px; padding: 4px 9px; font-size: 11px; font-family: inherit; cursor: pointer;
+}
+button:hover { border-color: #4a4e5c; }
+button.primary { background: #ffe300; color: #000; border-color: #ffe300; font-weight: 700; }
+button.primary:hover { background: #ffeb40; }
+button.active  { background: #2a3a2a; color: #34c759; border-color: #34c759; }
+.ctrl { display: flex; align-items: center; gap: 5px; }
+.ctrl label { font-size: 10px; color: #555; white-space: nowrap; }
+.ctrl .v { font-size: 10px; color: #ffe300; min-width: 44px; text-align: right; }
+input[type=range] { width: 88px; accent-color: #ffe300; cursor: pointer; }
+a.back {
+  font-size: 11px; color: #555; text-decoration: none;
+  border: 1px solid #1e2130; border-radius: 4px; padding: 3px 8px; margin-left: auto;
+}
+a.back:hover { color: #aaa; border-color: #444; }
+#wrap { flex: 1; position: relative; overflow: hidden; }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hrow">
+    <h1>Norden 901<span>· Diagram View — lines &amp; forces only</span></h1>
+    <div class="sep"></div>
+    <label style="font-size:10px;color:#555">Scenario</label>
+    <select id="scenario">
+      <option value="static">Static</option>
+      <option value="bump" selected>Bump</option>
+      <option value="pothole">Pothole</option>
+      <option value="washboard">Washboard</option>
+      <option value="brake">Braking</option>
+      <option value="accel">Accel</option>
+      <option value="jump">Jump</option>
+      <option value="corner">Corner</option>
+    </select>
+    <div class="sep"></div>
+    <button class="primary" id="playBtn">▶ Play</button>
+    <button id="resetBtn">Reset</button>
+    <button id="loopBtn" class="active">⟳ Loop: ON</button>
+    <a href="index.html" class="back">← Full sim</a>
+  </div>
+  <div class="hrow">
+    <div class="ctrl"><label>Rider</label>
+      <input type="range" id="rider" min="50" max="130" step="1" value="85">
+      <span class="v" id="riderV">85 kg</span></div>
+    <div class="sep"></div>
+    <div class="ctrl"><label>F comp</label>
+      <input type="range" id="fComp" min="0" max="30" step="1" value="15">
+      <span class="v" id="fCompV">15 ck</span></div>
+    <div class="ctrl"><label>F reb</label>
+      <input type="range" id="fReb" min="0" max="30" step="1" value="15">
+      <span class="v" id="fRebV">15 ck</span></div>
+    <div class="sep"></div>
+    <div class="ctrl"><label>R comp</label>
+      <input type="range" id="rComp" min="0" max="30" step="1" value="15">
+      <span class="v" id="rCompV">15 ck</span></div>
+    <div class="ctrl"><label>R reb</label>
+      <input type="range" id="rReb" min="0" max="30" step="1" value="15">
+      <span class="v" id="rRebV">15 ck</span></div>
+    <div class="sep"></div>
+    <div class="ctrl"><label>Speed</label>
+      <input type="range" id="speed" min="10" max="160" step="5" value="60">
+      <span class="v" id="speedV">60 km/h</span></div>
+    <div class="ctrl"><label>Bump H</label>
+      <input type="range" id="bumpH" min="5" max="200" step="5" value="60">
+      <span class="v" id="bumpHV">60 mm</span></div>
+  </div>
+</header>
+
+<div id="wrap">
+  <canvas id="diag"></canvas>
+</div>
+
+<script src="physics.js"></script>
+<script>
+'use strict';
+
+const cv  = $('diag');
+const ctx = cv.getContext('2d');
+
+/* ---- Global state (physics.js terrain() reads these globals) ---- */
+let loopMode = true;
+
+const state = Object.assign(structuredClone(STOCK), {
+  speed: 60, bumpH: 60, bumpL: 300,
+});
+
+let staticSag = { f: 0, r: 0 };
+let sim = {
+  t: 0, zfDyn: 0, zfV: 0, zrDyn: 0, zrV: 0,
+  ztF: 0, ztFv: 0, ztR: 0, ztRv: 0,
+  Fdyn_front: 0, Fdyn_rear: 0,
+  airborne: false, vAir: 0, yAir: 0,
+  history: [], peakA: 0, lastA: 0, bottom: false,
+};
+
+function recompute() {
+  const p = params();
+  staticSag.f = Math.max(0, (p.m_front_sprung * g - p.Fpre_F) / p.kF);
+  staticSag.r = Math.max(0, (p.m_rear_sprung  * g - p.Fpre_R) / p.kR);
+}
+
+function resetSim() {
+  Object.assign(sim, {
+    t: 0, zfDyn: 0, zfV: 0, zrDyn: 0, zrV: 0,
+    ztF: 0, ztFv: 0, ztR: 0, ztRv: 0,
+    Fdyn_front: 0, Fdyn_rear: 0,
+    airborne: false, vAir: 0, yAir: 0,
+    peakA: 0, lastA: 0, bottom: false,
+  });
+  sim.history.length = 0;
+  if (state.scenario === 'jump') { sim.airborne = true; sim.yAir = state.jumpH; sim.vAir = 0; }
+}
+
+/* ---- Colour helpers ---- */
+function compColor(pct) {
+  pct = Math.max(0, Math.min(1, pct));
+  if (pct < 0.5) {
+    const t = pct * 2;
+    return `rgb(${Math.round(40 + t * 215)},${Math.round(210 + t * 45)},${Math.round(255 - t * 255)})`;
+  }
+  const t = (pct - 0.5) * 2;
+  return `rgb(255,${Math.round(165 - t * 165)},0)`;
+}
+
+/* ---- Arrow primitive ---- */
+function arrow(x1, y1, x2, y2, color, lw, label) {
+  const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy);
+  if (len < 4) return;
+  const ux = dx / len, uy = dy / len;
+  const hw = 4 + lw * 1.6, hl = Math.min(13, len * 0.32);
+  ctx.save();
+  ctx.strokeStyle = color; ctx.fillStyle = color;
+  ctx.lineWidth = lw; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2 - ux * hl * 0.4, y2 - uy * hl * 0.4); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - ux * hl - uy * hw, y2 - uy * hl + ux * hw);
+  ctx.lineTo(x2 - ux * hl + uy * hw, y2 - uy * hl - ux * hw);
+  ctx.closePath(); ctx.fill();
+  if (label) {
+    ctx.font = 'bold 10px ui-monospace,monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, (x1 + x2) * 0.5 + uy * 15, (y1 + y2) * 0.5 - ux * 15);
+  }
+  ctx.restore();
+}
+
+/* ---- Terrain height at a given world-x for display ---- */
+function groundH(wx) {
+  const v = state.speed / 3.6 || 1;
+  if (state.scenario === 'bump' || state.scenario === 'pothole') {
+    const sign = state.scenario === 'pothole' ? -1 : 1;
+    const bh = state.bumpH / 1000 * sign;
+    const L  = state.bumpL / 1000;
+    const gap = Math.max(2.0, L * 3);
+    const period = L + gap;
+    const wOff = +BIKE.wb / 2 - (v * sim.t - 0.3 * v);
+    let xRel = wx - wOff;
+    if (loopMode) xRel = ((xRel % period) + period) % period;
+    if (xRel > 0 && xRel < L) return bh * 0.5 * (1 - Math.cos(2 * Math.PI * xRel / L));
+  } else if (state.scenario === 'washboard') {
+    const bh = state.bumpH / 2000;
+    const L  = state.bumpL / 1000;
+    return bh * Math.sin(2 * Math.PI * (wx - +BIKE.wb / 2 + v * sim.t) / L);
+  }
+  return 0;
+}
+
+/* ================================================================
+   MAIN DRAW
+   ================================================================ */
+const FORK_LEN = 0.50, ARM_LEN = 0.470;
+
+function draw() {
+  // Fit canvas to container with device pixel ratio
+  const dpr = window.devicePixelRatio || 1;
+  const W = cv.offsetWidth, H = cv.offsetHeight;
+  if (cv.width !== Math.round(W * dpr)) {
+    cv.width  = Math.round(W * dpr);
+    cv.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#0a0b0e'; ctx.fillRect(0, 0, W, H);
+
+  // World→screen: front wheel on the right, rear on the left.
+  const scale = Math.min(W / 3.4, H / 2.6, 290);
+  const CX = W * 0.48, CY = H * 0.67;
+  const sx = wx => CX + wx * scale;
+  const sy = wy => CY - wy * scale;
+
+  const fComp = staticSag.f + sim.zfDyn;
+  const rComp = staticSag.r + sim.zrDyn;
+  const fPct  = Math.max(0, Math.min(1, fComp / BIKE.fTravel));
+  const rPct  = Math.max(0, Math.min(1, rComp / BIKE.rTravel));
+  const ter   = terrain(sim.t);
+  const p     = params();
+
+  const xF = +BIKE.wb / 2, xR = -BIKE.wb / 2;
+  const wfWy = BIKE.rWheelF + (sim.airborne ? sim.yAir : ter.yF);
+  const wrWy = BIKE.rWheelR + (sim.airborne ? sim.yAir : ter.yR);
+  // Fork rake: triple clamp sits behind and above front axle along fork axis
+  const forkLen = FORK_LEN - fComp;
+  const tcWx = xF - forkLen * Math.sin(BIKE.rake);
+  const tcWy = wfWy + forkLen * Math.cos(BIKE.rake);
+  const spWy = wrWy + ARM_LEN  - rComp;   // swingarm pivot
+
+  const wfX = sx(xF), wfY = sy(wfWy);
+  const wrX = sx(xR), wrY = sy(wrWy);
+  const tcX = sx(tcWx), tcY = sy(tcWy);
+  const spX = sx(xR), spY = sy(spWy);
+
+  /* ------ GROUND & TERRAIN ---------------------------------------- */
+  const step = 4, nPts = Math.ceil(W / step) + 2;
+  const gPts = Array.from({ length: nPts }, (_, i) => ({
+    px: i * step,
+    py: sy(groundH((i * step - CX) / scale)),
+  }));
+
+  ctx.fillStyle = '#131620';
+  ctx.beginPath(); ctx.moveTo(0, H);
+  gPts.forEach(pt => ctx.lineTo(pt.px, pt.py));
+  ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
+
+  ctx.strokeStyle = '#3a404e'; ctx.lineWidth = 2;
+  ctx.beginPath();
+  gPts.forEach((pt, i) => i === 0 ? ctx.moveTo(pt.px, pt.py) : ctx.lineTo(pt.px, pt.py));
+  ctx.stroke();
+
+  // Wheel contact patches — small flat ellipses where tyre meets road
+  const ctF = { x: sx(xF),  y: sy(ter.yF) };
+  const ctR = { x: sx(xR),  y: sy(ter.yR) };
+  [[ctF, BIKE.rWheelF], [ctR, BIKE.rWheelR]].forEach(([c, r]) => {
+    const hw = r * scale * 0.28;
+    ctx.fillStyle = '#252a36';
+    ctx.beginPath(); ctx.ellipse(c.x, c.y, hw, 4, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#555e72'; ctx.lineWidth = 1.5; ctx.stroke();
+  });
+
+  /* ------ WHEELS -------------------------------------------------- */
+  const rfS = BIKE.rWheelF * scale, rrS = BIKE.rWheelR * scale;
+  const wAng  = sim.t * (state.speed / 3.6) / BIKE.rWheelF;
+  const wAngR = sim.t * (state.speed / 3.6) / BIKE.rWheelR;
+
+  function drawWheel(cx, cy, r, ang, isFront) {
+    // Tyre ring
+    ctx.strokeStyle = '#9ca3b8'; ctx.lineWidth = isFront ? 2 : 2.5;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+    // Thin inner rim line
+    ctx.strokeStyle = '#3a3e52'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, r * 0.72, 0, Math.PI * 2); ctx.stroke();
+    // Spokes ×4
+    ctx.strokeStyle = '#404560'; ctx.lineWidth = 1;
+    for (let i = 0; i < 4; i++) {
+      const a = ang + i * Math.PI / 4;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(a) * r * 0.70, cy + Math.sin(a) * r * 0.70);
+      ctx.lineTo(cx - Math.cos(a) * r * 0.70, cy - Math.sin(a) * r * 0.70);
+      ctx.stroke();
+    }
+    // Hub
+    ctx.beginPath(); ctx.arc(cx, cy, r * 0.11, 0, Math.PI * 2);
+    ctx.fillStyle = '#282d40'; ctx.fill();
+    ctx.strokeStyle = '#7078a0'; ctx.lineWidth = 1.5; ctx.stroke();
+  }
+
+  drawWheel(wfX, wfY, rfS, wAng,  true);
+  drawWheel(wrX, wrY, rrS, wAngR, false);
+
+  /* ------ FORK (front suspension) --------------------------------- */
+  const fCol = compColor(fPct);
+
+  // Dashed ghost showing full travel range (angled at rake)
+  ctx.save();
+  ctx.strokeStyle = '#1c2030'; ctx.lineWidth = 4; ctx.setLineDash([5, 6]);
+  const ghostTcX = sx(xF - FORK_LEN * Math.sin(BIKE.rake));
+  const ghostTcY = sy(wfWy + FORK_LEN * Math.cos(BIKE.rake));
+  ctx.beginPath(); ctx.moveTo(wfX, wfY); ctx.lineTo(ghostTcX, ghostTcY); ctx.stroke();
+  ctx.setLineDash([]); ctx.restore();
+
+  // Fork axis perpendicular (for leg offsets and triple clamp bar)
+  const forkAxisDX = tcX - wfX, forkAxisDY = tcY - wfY;
+  const forkAxisLen = Math.hypot(forkAxisDX, forkAxisDY) || 1;
+  const fPerpX = -forkAxisDY / forkAxisLen;
+  const fPerpY =  forkAxisDX / forkAxisLen;
+
+  // Actual fork — two parallel lines (USD fork legs), offset perpendicular to fork axis
+  [-5, +5].forEach(off => {
+    ctx.strokeStyle = fCol; ctx.lineWidth = 3.5; ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(wfX + fPerpX * off, wfY + fPerpY * off);
+    ctx.lineTo(tcX + fPerpX * off, tcY + fPerpY * off);
+    ctx.stroke();
+  });
+
+  // Triple clamp bar — perpendicular to fork axis
+  ctx.strokeStyle = fCol; ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(tcX - fPerpX * 8, tcY - fPerpY * 8);
+  ctx.lineTo(tcX + fPerpX * 8, tcY + fPerpY * 8);
+  ctx.stroke();
+
+  /* ------ SWINGARM ------------------------------------------------ */
+  const rCol = compColor(rPct);
+
+  ctx.strokeStyle = '#1e2230'; ctx.lineWidth = 11; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(wrX, wrY); ctx.lineTo(spX, spY); ctx.stroke();
+  ctx.strokeStyle = rCol; ctx.lineWidth = 7;
+  ctx.beginPath(); ctx.moveTo(wrX, wrY); ctx.lineTo(spX, spY); ctx.stroke();
+
+  /* ------ FRAME backbone ------------------------------------------ */
+  ctx.strokeStyle = '#c8ccd8'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(tcX, tcY); ctx.lineTo(spX, spY); ctx.stroke();
+
+  // Frame pivot markers
+  [[tcX, tcY], [spX, spY]].forEach(([x, y]) => {
+    ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2);
+    ctx.fillStyle = '#0e1018'; ctx.fill();
+    ctx.strokeStyle = '#8898c8'; ctx.lineWidth = 2; ctx.stroke();
+  });
+
+  /* ------ REAR SHOCK (parallel offset from frame) ----------------- */
+  const fdx = spX - tcX, fdy = spY - tcY;
+  const fLen = Math.hypot(fdx, fdy);
+  const fux = fdx / fLen, fuy = fdy / fLen;
+  const fnx = -fuy, fny = fux;
+  const sOff = 17; // px perpendicular offset from frame line
+
+  const shockPt = t => ({
+    x: tcX + fux * fLen * t + fnx * sOff,
+    y: tcY + fuy * fLen * t + fny * sOff,
+  });
+  const s0 = shockPt(0.16), s1 = shockPt(0.74);
+
+  ctx.strokeStyle = '#1a1e2a'; ctx.lineWidth = 11; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(s0.x, s0.y); ctx.lineTo(s1.x, s1.y); ctx.stroke();
+  ctx.strokeStyle = rCol; ctx.lineWidth = 8;
+  ctx.beginPath(); ctx.moveTo(s0.x, s0.y); ctx.lineTo(s1.x, s1.y); ctx.stroke();
+
+  [s0, s1].forEach(pt => {
+    ctx.beginPath(); ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2);
+    ctx.fillStyle = rCol; ctx.fill();
+  });
+
+  /* ------ RIDER (stick figure) ------------------------------------ */
+  let accelG = 0;
+  if (state.scenario === 'brake')  accelG = +state.decel * Math.min(1, sim.t / 0.2);
+  else if (state.scenario === 'accel') accelG = -state.decel * Math.min(1, sim.t / 0.2);
+
+  // Seat is at 68% along the tc→sp line
+  const sF = 0.68;
+  const seatX = tcX + fux * fLen * sF;
+  const seatY = tcY + fuy * fLen * sF;
+
+  // Handlebar near triple clamp
+  const barX = tcX + 0.03 * scale, barY = tcY + 0.03 * scale;
+
+  // Torso from seat upward, lean with accelG
+  const torsoLen = 0.18 * scale;
+  const torsoAngle = -Math.PI / 2 + accelG * 0.20;
+  const shoulderX = seatX + Math.cos(torsoAngle) * torsoLen;
+  const shoulderY = seatY + Math.sin(torsoAngle) * torsoLen;
+
+  ctx.strokeStyle = '#6070a0'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+  // Torso
+  ctx.beginPath(); ctx.moveTo(seatX, seatY); ctx.lineTo(shoulderX, shoulderY); ctx.stroke();
+  // Arms to bars
+  ctx.beginPath(); ctx.moveTo(shoulderX, shoulderY); ctx.lineTo(barX, barY); ctx.stroke();
+  // Head
+  const headR = 0.042 * scale;
+  ctx.beginPath(); ctx.arc(shoulderX, shoulderY - headR * 0.9, headR, 0, Math.PI * 2);
+  ctx.fillStyle = '#1a1e2e'; ctx.fill();
+  ctx.strokeStyle = '#6070a0'; ctx.lineWidth = 2; ctx.stroke();
+
+  /* ------ FORCE ARROWS -------------------------------------------- */
+
+  // Scales: spring 5 kN → 80 px, damping 2 kN → 50 px, weight 4 kN → 65 px
+  const FS_SCALE = 80 / 5000;
+  const FD_SCALE = 50 / 2000;
+  const FW_SCALE = 65 / 4000;
+
+  if (!sim.airborne) {
+    const Fs_F = p.kF * fComp;       // spring force front (N)
+    const Fs_R = p.kR * rComp;       // spring force rear  (N)
+
+    // --- Spring forces (cyan, upward from contact patches) ---
+    const fArrLen = Fs_F * FS_SCALE;
+    const rArrLen = Fs_R * FS_SCALE;
+    arrow(ctF.x, ctF.y, ctF.x, ctF.y - fArrLen,
+          '#00ccff', 2.5, `${(Fs_F / 1000).toFixed(1)} kN`);
+    arrow(ctR.x, ctR.y, ctR.x, ctR.y - rArrLen,
+          '#00ccff', 2.5, `${(Fs_R / 1000).toFixed(1)} kN`);
+
+    // Small "Fs" labels near base
+    ctx.fillStyle = '#00ccff'; ctx.font = '9px ui-monospace'; ctx.textAlign = 'center';
+    ctx.fillText('Fs', ctF.x - 14, ctF.y - fArrLen * 0.5 + 4);
+    ctx.fillText('Fs', ctR.x + 14, ctR.y - rArrLen * 0.5 + 4);
+
+    // --- Damping forces (yellow, direction = opposes relative compression velocity) ---
+    // Use relative velocity (sprung vs wheel) and two-stage dampForce() — same as integrator.
+    // Fd_F > 0 = upward on chassis (opposes compression); < 0 = downward (opposes rebound).
+    const crF = sim.zfV - sim.ztFv;
+    const crR = sim.zrV - sim.ztRv;
+    const Fd_F = crF > 0
+      ? dampForce(crF, p.cFcomp, p.cFcomp_hsc, BIKE.fLSCkneVel)
+      : dampForce(crF, p.cFreb,  p.cFreb_hsc,  BIKE.fLSCkneVel);
+    const Fd_R = crR > 0
+      ? dampForce(crR, p.cRcomp, p.cRcomp_hsc, BIKE.rLSCkneVel)
+      : dampForce(crR, p.cRreb,  p.cRreb_hsc,  BIKE.rLSCkneVel);
+
+    const dampOffF = rfS * 0.55, dampOffR = rrS * 0.55;
+
+    if (Math.abs(Fd_F) > 20) {
+      const len = Math.abs(Fd_F) * FD_SCALE;
+      const sign = Fd_F > 0 ? -1 : 1;   // -1 in screen y = upward
+      arrow(ctF.x + dampOffF, ctF.y,
+            ctF.x + dampOffF, ctF.y + sign * len,
+            '#ffd60a', 2, `${(Fd_F / 1000).toFixed(2)}`);
+      ctx.fillStyle = '#ffd60a'; ctx.font = '9px ui-monospace'; ctx.textAlign = 'left';
+      ctx.fillText('Fd', ctF.x + dampOffF + 6, ctF.y - sign * len * 0.5 + 4);
+    }
+    if (Math.abs(Fd_R) > 20) {
+      const len = Math.abs(Fd_R) * FD_SCALE;
+      const sign = Fd_R > 0 ? -1 : 1;
+      arrow(ctR.x - dampOffR, ctR.y,
+            ctR.x - dampOffR, ctR.y + sign * len,
+            '#ffd60a', 2, `${(Fd_R / 1000).toFixed(2)}`);
+      ctx.fillStyle = '#ffd60a'; ctx.font = '9px ui-monospace'; ctx.textAlign = 'right';
+      ctx.fillText('Fd', ctR.x - dampOffR - 6, ctR.y - sign * len * 0.5 + 4);
+    }
+  }
+
+  // --- Weight / gravity arrow (red, downward from CoG) ---
+  const cogShiftX = accelG * 0.04 * scale;
+  const cogWorldY = (tcWy + spWy) * 0.52 + 0.06;
+  const cogX = CX + cogShiftX, cogY = sy(cogWorldY);
+  const Fg = p.m_total * g;
+  const wArrLen = Fg * FW_SCALE;
+
+  arrow(cogX, cogY, cogX, cogY + wArrLen, '#ff453a', 2.5, `${(Fg / 1000).toFixed(1)} kN`);
+
+  // CoG marker
+  ctx.strokeStyle = '#ff453a'; ctx.lineWidth = 2;
+  ctx.fillStyle = 'rgba(255,69,58,0.12)';
+  ctx.beginPath(); ctx.arc(cogX, cogY, 7, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = '#ff453a'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(cogX - 6, cogY); ctx.lineTo(cogX + 6, cogY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cogX, cogY - 6); ctx.lineTo(cogX, cogY + 6); ctx.stroke();
+  ctx.fillStyle = '#ff453a'; ctx.font = 'bold 9px ui-monospace';
+  ctx.textAlign = 'left'; ctx.fillText('CoG', cogX + 9, cogY + 4);
+  ctx.fillStyle = '#ff453a'; ctx.font = '9px ui-monospace';
+  ctx.fillText('W', cogX + 9, cogY + wArrLen * 0.5 + 4);
+
+  /* ------ SUSPENSION TRAVEL LABELS -------------------------------- */
+  ctx.font = 'bold 12px ui-monospace'; ctx.lineCap = 'round';
+
+  // Front: label right of fork
+  ctx.fillStyle = fCol; ctx.textAlign = 'left';
+  ctx.fillText(`F ${(fPct * 100).toFixed(0)}%`, tcX + 13, (wfY + tcY) * 0.5 + 4);
+
+  // Rear: label left of swingarm
+  ctx.fillStyle = rCol; ctx.textAlign = 'right';
+  ctx.fillText(`R ${(rPct * 100).toFixed(0)}%`, spX - 13, (wrY + spY) * 0.5 + 4);
+
+  /* ------ PITCH INDICATOR ----------------------------------------- */
+  const frFy   = BIKE.rWheelF + (FORK_LEN - fComp) * Math.cos(BIKE.rake);
+  const frRy   = BIKE.rWheelR + ARM_LEN   - rComp;
+  const pitch  = Math.atan2(frRy - frFy, BIKE.wb) * 180 / Math.PI;
+  const pitchC = Math.abs(pitch) > 5 ? '#ff8a00' : Math.abs(pitch) > 2.5 ? '#ffe300' : '#3a4055';
+
+  ctx.fillStyle = pitchC; ctx.font = '11px ui-monospace'; ctx.textAlign = 'center';
+  ctx.fillText(`pitch ${pitch > 0 ? '+' : ''}${pitch.toFixed(1)}°`,
+               CX, sy((tcWy + spWy) * 0.5 - 0.04));
+
+  /* ------ AIRBORNE LABEL ------------------------------------------ */
+  if (sim.airborne) {
+    ctx.fillStyle = '#4fc3f7'; ctx.font = 'bold 14px ui-monospace'; ctx.textAlign = 'center';
+    ctx.fillText(`✈ AIRBORNE  ${sim.yAir.toFixed(2)} m`, CX, CY - H * 0.1);
+  }
+
+  /* ------ PEAK G + TIME ------------------------------------------- */
+  const gVal = sim.peakA / g;
+  ctx.textAlign = 'right';
+  ctx.fillStyle = gVal > 4 ? '#ff453a' : gVal > 2.5 ? '#ff8a00' : '#353a50';
+  ctx.font = 'bold 11px ui-monospace';
+  ctx.fillText(`peak ${gVal.toFixed(2)} g`, W - 12, 20);
+  ctx.fillStyle = '#2a2e40'; ctx.font = '11px ui-monospace';
+  ctx.fillText(`t = ${sim.t.toFixed(2)} s`, W - 12, 35);
+
+  /* ------ LEGEND -------------------------------------------------- */
+  const leg = [
+    { c: '#9ca3b8', l: 'Frame / swingarm / wheels' },
+    { c: '#40ccff', l: 'Fork · shock  (cyan = 0%  →  red = 100%)' },
+    { c: '#00ccff', l: 'Fs = spring force  (k · x)' },
+    { c: '#ffd60a', l: 'Fd = damping force  (LSC/HSC · Δẋ_rel)' },
+    { c: '#ff453a', l: 'W  = weight  (m · g)' },
+  ];
+  const lx = 12, ly0 = H - leg.length * 14 - 8;
+  ctx.lineWidth = 2.5; ctx.font = '10px ui-monospace'; ctx.textAlign = 'left';
+  leg.forEach((item, i) => {
+    const y = ly0 + i * 14;
+    ctx.strokeStyle = item.c;
+    ctx.beginPath(); ctx.moveTo(lx, y); ctx.lineTo(lx + 18, y); ctx.stroke();
+    ctx.fillStyle = '#3a3e52';
+    ctx.fillText(item.l, lx + 24, y + 4);
+  });
+}
+
+/* ---- UI wiring ---- */
+let playing = false, lastT = 0;
+
+$('playBtn').addEventListener('click', () => {
+  playing = !playing;
+  $('playBtn').textContent = playing ? '❚❚ Pause' : '▶ Play';
+  if (playing) lastT = performance.now();
+});
+$('resetBtn').addEventListener('click', () => { resetSim(); draw(); });
+$('loopBtn').addEventListener('click', () => {
+  loopMode = !loopMode;
+  $('loopBtn').textContent = loopMode ? '⟳ Loop: ON' : '⟳ Loop: off';
+  $('loopBtn').className   = loopMode ? 'active' : '';
+});
+$('scenario').addEventListener('change', e => {
+  state.scenario = e.target.value;
+  resetSim(); draw();
+});
+
+function bind(id, key, fmt) {
+  const el = $(id), vEl = $(id + 'V');
+  el.value = state[key];
+  if (vEl) vEl.textContent = fmt(state[key]);
+  el.addEventListener('input', () => {
+    state[key] = +el.value;
+    if (vEl) vEl.textContent = fmt(state[key]);
+    recompute(); resetSim(); draw();
+  });
+}
+bind('rider', 'rider', v => `${v} kg`);
+bind('fComp', 'fComp', v => `${v} ck`);
+bind('fReb',  'fReb',  v => `${v} ck`);
+bind('rComp', 'rComp', v => `${v} ck`);
+bind('rReb',  'rReb',  v => `${v} ck`);
+bind('speed', 'speed', v => `${v} km/h`);
+bind('bumpH', 'bumpH', v => `${v} mm`);
+
+/* ---- Animation loop ---- */
+function animLoop(now) {
+  if (playing) {
+    let dt = (now - lastT) / 1000;
+    if (dt > 0.1) dt = 0.1;
+    lastT = now;
+    const p = params();
+    let acc = dt;
+    while (acc > 0) {
+      const s = Math.min(DT, acc);
+      stepWith(s, sim, p, staticSag);
+      acc -= s;
+    }
+    if (!loopMode && sim.t > 6 &&
+        !['static','washboard','brake','accel','corner'].includes(state.scenario)) {
+      playing = false;
+      $('playBtn').textContent = '▶ Play';
+    }
+  }
+  draw();
+  requestAnimationFrame(animLoop);
+}
+
+recompute();
+resetSim();
+requestAnimationFrame(animLoop);
+window.addEventListener('resize', draw);
+</script>
+</body>
+</html>
